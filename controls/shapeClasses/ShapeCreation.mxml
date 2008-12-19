@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml" 
+	width="225" height="200"
+	layout="vertical"
+	titleIcon="{Globals.g_assets.ShapeIcon}"
+	title="Create Shape"
+	horizontalScrollPolicy="off" verticalScrollPolicy="off"
+	showCloseButton="true"
+
+	styleName="CloudDialog"
+	titleStyleName="CloudDialogTitle"
+
+	creationComplete="onCreationComplete()"
+	close="onClickCancel()">
+
+
+	<mx:Script>
+	<![CDATA[
+
+		import mx.managers.PopUpManager;
+
+		// Static instance, singleton
+		public static var shapeCreation:ShapeCreation = new ShapeCreation();
+
+		[Bindable]
+		private var shapeBitmap:Bitmap = null;
+
+
+
+		private function onCreationComplete():void
+		{
+			
+		}
+
+
+		private function onClickOk():void
+		{
+			var shape:CloudShape = new CloudShape();
+			shape.name = shapeNameInput.text;
+			shape.iconBitmap = shapeBitmap;
+			this.dispatchEvent(new ShapeEvent('newShape', shape));
+
+			PopUpManager.removePopUp(shapeCreation);
+		}
+
+		private function onClickCancel():void
+		{
+			PopUpManager.removePopUp(shapeCreation);
+		}
+
+	]]>
+    </mx:Script>
+
+
+
+
+	<mx:VBox id="createdShapeBox" borderStyle="solid"
+		visible="false" includeInLayout="{createdShapeBox.visible}"
+		height="100">
+
+		<mx:Image id="shapeImage" source="{shapeBitmap}" />
+
+		<mx:Form>
+			<mx:FormItem label="Shape Name:">
+				<mx:TextInput id="shapeNameInput" />
+			</mx:FormItem>
+		</mx:Form>
+
+	</mx:VBox>
+
+
+	<mx:ControlBar width="100%"
+		horizontalAlign="center">
+
+		<mx:Button id="okButton" label="Create" click="onClickCancel()" styleName="OkButton" />
+		<mx:Button id="cancelButton" label="Cancel" click="onClickCancel()" styleName="CancelButton" />
+
+	</mx:ControlBar>
+
+</mx:TitleWindow>

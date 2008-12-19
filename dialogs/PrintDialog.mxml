@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:cloudControls="controls.*" xmlns:cloudDialogs="dialogs.*"
+	width="500" height="500"
+	maxWidth="500" maxHeight="500"
+	titleIcon="{Globals.g_assets.PrintIcon}"
+	title="Print Image"
+	layout="vertical"
+	horizontalScrollPolicy="off" verticalScrollPolicy="off"
+	showCloseButton="true"
+
+	styleName="CloudDialog"
+	titleStyleName="CloudDialogTitle"
+
+	creationComplete="onCreationComplete()"
+	close="onClickCancel()">
+
+
+	<mx:Script>
+    <![CDATA[
+		import mx.controls.Alert;
+        import mx.managers.CursorManager;
+		import mx.managers.PopUpManager;
+
+		import core.CanvasCloud;
+
+
+		// Static instance, singleton
+		public static const printDialog:PrintDialog = new PrintDialog();
+
+		[Bindable]
+		private var canvas:CanvasCloud = null;
+
+
+
+		private function onCreationComplete():void
+		{
+			// Set the Right Click menu for this Dialog
+   			var rightClickMenu:RightClickMenu = new RightClickMenu(this.title);
+   			this.contextMenu = rightClickMenu.triCloudContextMenu;
+		}
+
+
+		public function Init(canvas:CanvasCloud):void
+		{
+			this.width = Math.min(maxWidth, this.parentApplication.width);
+    		this.height = Math.min(maxHeight, this.parentApplication.height);
+
+			// Image
+			if(!canvas)
+			{
+				CloudAlert.show('Error: Invalid Canvas','Export');
+				return;
+			}
+			this.canvas = canvas;
+
+			if(imagePreview)
+				imagePreview.init();
+		}
+
+		private function onClickPrint():void
+		{
+		
+		}
+
+		private function onClickCancel():void
+		{
+			PopUpManager.removePopUp(printDialog);
+		}
+
+	]]>
+    </mx:Script>
+
+
+	<!-- SOURCE IMAGE THUMB -->
+	<cloudDialogs:ImagePreview id="imagePreview"
+		sourcePanel="{canvas}" 
+		iconWidth="100" iconHeight="100"/>
+
+
+ 	<mx:ControlBar>
+		<mx:Button id="printButton" label="Print" click="onClickPrint()" styleName="OkButton" />
+		<mx:Button id="cancelButton" label="Cancel" click="onClickCancel()" styleName="CancelButton" />		
+	</mx:ControlBar>
+	
+	
+</mx:TitleWindow>

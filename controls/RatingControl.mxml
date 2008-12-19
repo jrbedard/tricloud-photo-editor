@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:HBox xmlns:mx="http://www.adobe.com/2006/mxml"
+	width="80" height="16" 
+	horizontalGap="0"
+	currentState="view">
+
+
+	<mx:Script>
+    <![CDATA[
+    	import mx.controls.Image;
+
+
+		[Bindable]
+		public var cloudID:uint = 0;
+
+		private const maxRating:uint = 5;
+
+		private var _rating:uint = 0;
+		private var _ratingCount:uint = 0;
+
+		private var _editable:Boolean = false;
+		private var _displayNotStar:Boolean = true;
+
+
+		// RATING value
+		[Inspectable(defaultValue=0)]
+		public function set rating(value:uint):void
+		{
+			_rating = value;
+			RenderStars();
+		}
+		[Bindable]
+		public function get rating():uint
+		{
+			return _rating;
+		}
+
+		// RATING COUNT
+		[Inspectable(defaultValue=0)]
+		public function set ratingCount(value:uint):void
+		{
+			_ratingCount = value;
+			RenderStars();
+		}
+		[Bindable]
+		public function get ratingCount():uint
+		{
+			return _ratingCount;
+		}
+
+
+
+
+		// EDITABLE flag
+		[Inspectable(defaultValue=false)]
+		public function set editable(value:Boolean):void
+		{
+			_editable = value;
+			RenderStars();
+			// TODO: add rate
+		}
+		[Bindable]
+		public function get editable():Boolean
+		{
+			return _editable;
+		}
+
+		
+
+		// DISPLAY notStar flag
+		[Inspectable(defaultValue=true)]
+		public function set displayNotStar(value:Boolean):void
+		{
+			_displayNotStar = value;
+			RenderStars();
+			// TODO: add rate
+		}
+		[Bindable]
+		public function get displayNotStar():Boolean
+		{
+			return _displayNotStar;
+		}
+
+
+
+		// Render Star System
+		private function RenderStars():void
+		{
+			this.removeAllChildren();
+
+			var star:uint = 0;
+
+			for(star = 0; star < rating; ++star) // For each star
+			{
+				var starImage:Image = new Image();
+				starImage.source = Globals.g_assets.StarIcon;
+				starImage.width = this.width/5;
+				starImage.height = this.height;
+				this.addChild(starImage); // add star
+			}
+
+			if(displayNotStar) // display not-stars
+			{
+				for(star = rating; star < maxRating; ++star) // For each non star
+				{
+					var notStarImage:Image = new Image();
+					notStarImage.source = Globals.g_assets.NoStarIcon;
+					notStarImage.width = this.width/5;
+					notStarImage.height = this.height;
+					this.addChild(notStarImage); // add empty star
+				}
+			}
+
+			//tempRating.text = "ar:" + rating + " rc:" + ratingCount;
+		}
+
+    ]]>
+    </mx:Script>
+
+
+	<mx:Label id="tempRating" text="{rating} ({ratingCount})" />	
+
+
+	<mx:states>
+		<mx:State name="view">
+			
+		</mx:State>
+
+		<mx:State name="edit">
+	
+		</mx:State>
+	</mx:states>
+
+</mx:HBox>

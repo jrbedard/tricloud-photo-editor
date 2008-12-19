@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Panel xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:panels="panels.*" xmlns:cloudPanels="cloud.panels.*"
+	xmlns:cloudType ="cloud.type.*"
+	width="100%" height="100%" 
+	layout="horizontal" 
+	verticalScrollPolicy="off" horizontalScrollPolicy="off"
+
+	backgroundAlpha="0"
+	horizontalAlign="center" verticalAlign="top"
+	horizontalGap="0"
+	paddingBottom="0" paddingTop="0" headerHeight="0"
+	borderThicknessBottom="0" borderThicknessLeft="0" borderThicknessTop="0" borderThicknessRight="0"
+	dropShadowEnabled="false">
+
+
+  	<mx:Script>
+	<![CDATA[
+
+		import core.Cloud;
+
+		// TODO: Remove this component??
+
+		[Bindable]
+		public var selectedTool:String = "";
+
+		[Bindable]
+		public var selectedSubTool:String = "";
+
+
+		// Store list of opened dialog for this panel?		
+		// Close opened dialog
+		//CloudDialogManager.HideAllDialog();
+
+
+	]]>
+	</mx:Script>
+
+
+	<!-- EFFECTS Cloud Tool Transitions -->
+	<mx:Fade id="cloudToolShow" alphaFrom="0.0" alphaTo="1.0" duration="250" />
+	<mx:Fade id="cloudToolHide" alphaFrom="1.0" alphaTo="0.0" duration="0" />
+
+	<mx:Fade id="cloudSubToolShow" alphaFrom="0.0" alphaTo="1.0" duration="250" />
+	<mx:Fade id="cloudSubToolHide" alphaFrom="1.0" alphaTo="0.0" duration="250" />
+
+
+	<mx:Style>
+
+		/* Cloud ToolBar */
+		.CloudToolBar
+		{
+			borderStyle: none;
+			borderSides: left, right;
+		}
+
+		/* Button Tabs ex: Brush, Line, Circle, Shape, etc */
+  		.CloudToolTab
+  		{
+  			width: 32; height: 32;
+  			borderStyle: none;
+  			verticalGap: 0;
+  			fillAlphas: 0.0, 0.0;
+  			cornerRadius: 0;
+  			borderSides: left, right;
+  		}
+
+		/* Tool Button ex: Brush, Line */
+		.CloudToolButton
+		{
+			borderSides: left, right;
+			fillAlphas: 0.0, 0.0;
+		}
+
+		/* Cloud Tool ViewStack */
+		.CloudViewStack
+  		{
+  			 paddingTop: 0;
+			 borderStyle: solid; borderSides: left, top, right; 
+			 borderThickness: 2;
+			 cornerRadius: 30;
+			 background-color: #F7F7F7; background-alpha: 0.25;
+  		}
+ 
+ 		/* VBox Cloud Tool */
+		.CloudTool
+		{
+			paddingTop: 2; paddingBottom: 0;
+			horizontalAlign: center; verticalAlign: top;
+			verticalGap: 0;
+			background-alpha: 0.0;
+  		}
+
+		/* Cloud Tool type Label */
+		.CloudToolLabel
+		{
+			fontWeight: bold;
+		}
+
+		/* HBox inside CloudTool that contains CloudSubTool Buttons */
+		.CloudSubTool
+		{
+			paddingTop: 2; paddingBottom: 0;
+			verticalAlign: middle;
+		}
+
+		.CloudSubToolButton
+		{
+			
+		}
+	
+	</mx:Style>
+
+
+</mx:Panel>

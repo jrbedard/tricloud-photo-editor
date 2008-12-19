@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VSlider xmlns:mx="http://www.adobe.com/2006/mxml"
+	height="100"
+	minimum="0" maximum="60"
+	value="0"
+
+	liveDragging="true" allowTrackClick="true"
+	snapInterval="1"
+	tickInterval="10" tickColor="0x000000" tickThickness="1"
+	tickOffset="10"
+	labels="['60','30','0']" labelOffset="13"
+
+	toolTip="Select the line thickness from 0 to 60"
+	dataTipFormatFunction="dataTipFunc"
+	dataTipOffset="-50"
+ 
+	labelStyleName="SliderLabel"
+	sliderThumbClass="controls.thicknessClasses.ThicknessThumb"
+
+	creationComplete="onCreationComplete()"
+	thumbPress="CloudCursor.SetCursor(CloudCursor.TRANSLATE_HORI);"
+	thumbRelease="CloudCursor.SetCursor(CloudCursor.NORMAL);"
+	change="onChange(event)">
+
+
+
+	<mx:Script>
+    <![CDATA[
+
+		import mx.events.SliderEvent;
+		import mx.binding.utils.BindingUtils;
+
+		import controls.colorClasses.CloudGradient;
+		import controls.thicknessClasses.ThicknessThumb
+
+
+		// Cursor Types
+		public static const CURSOR_SQUARE:String = "square";
+		public static const CURSOR_CIRCLE:String = "circle";
+		public static const CURSOR_BITMAP:String = "bitmap";
+		public static const CURSOR_FONT:String = "font";
+
+
+		[Bindable]
+		public var label:String = '';
+
+
+		private function onCreationComplete():void
+		{
+			
+		}
+
+
+		// Shape
+		public function set cursorType(value:String):void
+		{
+			if(GetThicknessThumb())
+				GetThicknessThumb().cursorType = value;
+		}
+		[Bindable]
+		public function get cursorType():String
+		{
+			if(GetThicknessThumb())
+				return GetThicknessThumb().cursorType;
+			else
+				return CURSOR_SQUARE;
+		}
+
+
+		// Color
+		public function set cursorColor(value:uint):void
+		{
+			if(GetThicknessThumb())
+				GetThicknessThumb().cursorColor = value;
+		}
+		[Bindable]
+		public function get cursorColor():uint
+		{
+			if(GetThicknessThumb())
+				return GetThicknessThumb().cursorColor;
+			else
+				return 0x000000;
+		}
+
+
+		// Alpha
+		public function set cursorAlpha(value:Number):void
+		{
+			if(GetThicknessThumb())
+				GetThicknessThumb().cursorAlpha = value;
+		}
+		[Bindable]
+		public function get cursorAlpha():Number
+		{
+			if(GetThicknessThumb())
+				return GetThicknessThumb().cursorAlpha;
+			else
+				return 1.0;
+		}
+
+
+		// Gradient
+		public function set cursorGradient(value:CloudGradient):void
+		{
+			if(GetThicknessThumb())
+				GetThicknessThumb().cursorGradient = value;
+		}
+		[Bindable]
+		public function get cursorGradient():CloudGradient
+		{
+			if(GetThicknessThumb())
+				return GetThicknessThumb().cursorGradient;
+			else
+				return new CloudGradient();
+		}
+
+
+		// Bitmap
+		public function set cursorBitmap(value:Bitmap):void
+		{
+			if(GetThicknessThumb())
+				GetThicknessThumb().cursorBitmap = value;
+		}
+		[Bindable]
+		public function get cursorBitmap():Bitmap
+		{
+			if(GetThicknessThumb())
+				return GetThicknessThumb().cursorBitmap;
+			else
+				return new Bitmap();
+		}
+
+
+		// Text
+		public function set cursorFont(value:String):void
+		{
+			if(GetThicknessThumb())
+				GetThicknessThumb().cursorFont = value;
+		}
+		[Bindable]
+		public function get cursorFont():String
+		{
+			if(GetThicknessThumb())
+				return GetThicknessThumb().cursorFont;
+			else
+				return '';
+		}
+
+
+		// DONT USE VALUE directly
+
+		// Value
+		public function set cursorValue(value:Number):void
+		{
+			this.value = value;
+			if(GetThicknessThumb())
+				GetThicknessThumb().sliderValue = value;
+		}
+		[Bindable]
+		public function get cursorValue():Number
+		{
+			if(GetThicknessThumb())
+				return GetThicknessThumb().sliderValue;
+			else
+				return 0;
+		}
+
+
+
+
+
+		// Get Thickness Thumb
+		private function GetThicknessThumb():ThicknessThumb
+		{
+			return ThicknessThumb(this.getThumbAt(0));
+		}
+
+
+
+		// on Change thickness value, TODO: update cursor size aswell, because this is cool now. ;)
+		private function onChange(event:SliderEvent):void
+		{
+			if(GetThicknessThumb())
+				GetThicknessThumb().sliderValue = event.value;
+		}
+
+
+		private function dataTipFunc(val:String):String
+		{
+			return val;
+		}
+
+  	]]>
+    </mx:Script>
+
+
+	<mx:Style>
+
+		.SliderLabel
+		{
+			
+		}
+
+	</mx:Style>
+
+	<!--mx:Label id="thicknessLabel" 
+		text="asdf{label}" rotation="0.0" fontFamily="baveuse3"  fontAntiAliasType="advanced"/-->
+
+</mx:VSlider>

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml" 
+	layout="vertical" width="200" height="300"
+	title="Settings"
+	horizontalScrollPolicy="off" verticalScrollPolicy="off"
+	showCloseButton="true"
+
+	styleName="CloudDialog"
+	titleStyleName="CloudDialogTitle"
+
+	creationComplete="onCreationComplete()">
+
+
+	<mx:Script>
+    <![CDATA[
+    
+    	private function onCreationComplete():void
+		{
+			// Set the Right Click menu for this Dialog
+   			var rightClickMenu:RightClickMenu = new RightClickMenu(this.title);
+   			this.contextMenu = rightClickMenu.triCloudContextMenu;
+
+		}
+    
+    
+    ]]>
+    </mx:Script>
+
+
+</mx:TitleWindow>

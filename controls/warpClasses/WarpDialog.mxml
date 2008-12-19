@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml" 
+	width="220" height="210"
+	layout="vertical"
+	titleIcon="{Globals.g_assets.WarpIcon}"
+	title="Text Warp"
+	horizontalScrollPolicy="off" verticalScrollPolicy="off"
+	showCloseButton="true"
+
+	styleName="CloudDialog"
+	titleStyleName="CloudDialogTitle"
+	paddingTop="0" paddingBottom="0"
+
+	creationComplete="onCreationComplete()">
+
+
+	<mx:Script>
+    <![CDATA[
+
+		import mx.events.ListEvent;
+		import mx.collections.ArrayCollection;
+
+
+		// Static instance, singleton
+		public static var warpDialog:WarpDialog = new WarpDialog();
+
+
+		[Bindable]
+		public var warpList:ArrayCollection = new ArrayCollection(); // Array of Warp
+
+
+		private function onCreationComplete():void
+		{
+			PopulateWarpList();
+
+			warpGrid.selectedIndex = 0;
+
+			// Set the Right Click menu for this Dialog
+   			var rightClickMenu:RightClickMenu = new RightClickMenu(this.title);
+   			this.contextMenu = rightClickMenu.triCloudContextMenu;
+		}
+
+		private function PopulateWarpList():void
+		{
+			var warpFactory:WarpFactory = new WarpFactory();
+			warpFactory.Populate(warpList);
+		}
+
+		private function onItemClickWarpList(event:ListEvent):void
+ 		{
+ 			this.dispatchEvent(new WarpEvent("warpChanged", event.target.selectedItem as CloudWarp));
+ 		}
+
+		private function onItemDoubleClickWarpList(event:ListEvent):void
+		{
+			onItemClickWarpList(event);
+			this.dispatchEvent(new Event('close'))
+		}
+
+	]]>
+    </mx:Script>
+
+
+	<!-- WARP LIST -->
+	<mx:TileList id="warpGrid" width="100%" height="100%"
+		wordWrap="true"
+		allowDragSelection="false" dragEnabled="false" dropEnabled="false"
+		rowCount="8" rowHeight="36" 
+		columnCount="8" columnWidth="36"
+		doubleClickEnabled="true"
+
+		verticalAlign="middle"
+		backgroundAlpha="0.5"
+		dropShadowEnabled="false"
+
+		dataProvider="{warpList}"
+		itemRenderer="controls.warpClasses.WarpItem"
+		itemClick="onItemClickWarpList(event)"
+		itemDoubleClick="onItemDoubleClickWarpList(event)"/>
+
+
+	<mx:ControlBar width="100%"
+		horizontalAlign="center"
+		paddingBottom="3" paddingLeft="0" paddingRight="0" paddingTop="3">
+	</mx:ControlBar>
+
+
+</mx:TitleWindow>

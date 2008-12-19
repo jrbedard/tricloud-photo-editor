@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml"
+
+	verticalAlign="middle">
+
+
+	<mx:Script>
+    <![CDATA[
+
+		import controls.effectClasses.CloudEffect;
+
+
+		[Bindable]
+		private var cloudEffect:CloudEffect = null;
+
+		[Bindable]
+		private var effectXML:XML = null;
+
+
+		// Init
+		public function init(cloudEffect:CloudEffect):void
+		{
+			this.cloudEffect = cloudEffect;
+
+			effectXML = this.cloudEffect.Save();
+		}
+
+	]]>
+    </mx:Script>
+
+</mx:VBox>

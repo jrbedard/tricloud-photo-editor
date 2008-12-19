@@ -1,0 +1,303 @@
+<?xml version="1.0" encoding="utf-8"?>
+<cloudType:CloudToolPanel xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:cloudType="type.*" xmlns:cloudControls="controls.*"
+	label="Image Cloud"
+	creationComplete="onCreationComplete()">
+
+
+	<mx:Script>
+    <![CDATA[
+    	import mx.controls.Image;
+
+    	import core.Cloud;
+    	import type.ImageCloud;
+    	import type.image.ImageStyle;
+    	import core.CloudNavigator;
+
+		import library.CloudLibraryBrowseEvent;
+		import share.ShareController;
+
+
+
+		[Bindable]
+		private var imageCloud:ImageCloud = null;
+
+		[Bindable]
+		private var imageStyle:ImageStyle = null;
+
+
+
+		private function onCreationComplete():void
+		{
+			selectedTool = imageToolViewStack.selectedChild.name;
+		}
+
+
+		public function SetCloud(sCloud:Cloud):void
+		{
+			imageCloud = ImageCloud(sCloud);
+
+			imageStyle = imageCloud.imageStyle;
+		}
+
+
+		private function onClickImageToolBar():void
+		{
+			selectedTool = imageToolViewStack.selectedChild.name;
+			this.label = selectedTool;
+
+			cropModeBtn.selected = false;
+		}
+
+		private function onClickFlipImage(horizontal:Boolean):void
+		{
+			imageCloud.FlipImage(horizontal);
+		}
+
+		private function onClickRotateImage90(clockWise:Boolean):void
+		{
+			imageCloud.RotateImage90(clockWise);
+		}
+
+
+		private function onChangeImageBrightness():void
+		{
+			imageCloud.AdjustBrightness(imageBrightness.value/100);
+		}
+
+		private function onChangeImageContrast():void
+		{
+			imageCloud.AdjustContrast(imageContrast.value);
+		}
+
+
+		private function onChangeCropModeBtn():void
+		{
+			var cloudNavigator:CloudNavigator = CloudEngine.GetInstance().GetCloudController().cloudNavigator;
+			if(!cloudNavigator)
+				return;
+
+			if(cropModeBtn.selected) // Go to CropMode
+			{
+				if(cloudNavigator.currentState == 'locked')
+					cloudNavigator.setCurrentState('lockedCropMode'); // crop mode
+			}
+			else // Come back from CropMode
+			{
+				if(cloudNavigator.currentState == 'lockedCropMode')
+					cloudNavigator.setCurrentState('locked'); // locked
+			}
+		}
+
+
+		// Convert Image Cloud to Draw Cloud
+		private function onClickConvertToDrawCloud():void
+		{
+		
+		}
+
+
+
+		private function onClickBrowse():void
+		{
+			// Open the Cloud Library to browse/search for Brushes
+			TriCloud(this.parentApplication).dispatchEvent(
+				new CloudLibraryBrowseEvent("browseCloudLibrary", '', "useCount", CloudType.ST_IMAGE));
+		}
+
+		private function onClickShareImage():void
+		{
+			var shareController:ShareController = CloudEngine.GetInstance().GetShareController();
+			shareController.ShareImageCloud(imageCloud);
+		}
+
+
+	]]>
+    </mx:Script>
+
+
+	<!-- LEFT BOX (Convert to Draw) -->
+	<mx:VBox width="64" height="100%"
+		horizontalAlign="center" verticalAlign="bottom"
+		paddingBottom="20">
+
+		<mx:Button id="convertToImageCloudBtn" x="0" y="70"
+			width="48" height="24"
+			toolTip="Convert Image Cloud to Draw Cloud"
+			click="onClickConvertToDrawCloud()"/>
+
+	</mx:VBox>
+
+
+	<!-- IMAGE TOOL PANEL -->
+	<mx:VBox width="100%" height="100%"
+		horizontalAlign="center" verticalAlign="top"
+		verticalGap="0">
+
+
+		<!-- IMAGE TOOLBAR -->
+		<mx:TabBar id="imageToolBar"
+			dataProvider="{imageToolViewStack}"
+			direction="horizontal"
+			tabWidth="42" tabHeight="32"
+			buttonMode="true"			
+
+			styleName="CloudToolBar"
+			tabStyleName="CloudToolTab"
+			buttonStyleName="CloudToolButton"
+
+			itemClick="onClickImageToolBar()"/>
+
+
+		<!-- IMAGE TOOLS VIEWSTACK -->
+		<mx:ViewStack id="imageToolViewStack" width="100%"
+			 creationPolicy="all" selectedIndex="0"
+			 styleName="CloudViewStack">
+
+
+			<!-- IMAGE BRIGHTNESS -->
+			<mx:VBox id="brightnessBox" name="Image Brightness" width="100%" 
+				icon="{Globals.g_assets.ImageBrightnessIcon}"
+				toolTip="Image Brightness"
+				styleName="CloudTool"
+				showEffect="cloudToolShow"
+				hideEffect="cloudToolHide">
+
+				<mx:Label text="{this.label}" styleName="CloudToolLabel" />
+				<mx:HBox styleName="CloudSubTool">
+
+					<mx:HSlider id="imageBrightness"
+						minimum="-100" maximum="100" width="150"
+						liveDragging="true" snapInterval="1"
+						tickInterval="10" tickColor="0x000000" tickThickness="1"
+						labels="['-100','0','100']"
+						toolTip="Select the Brightness from -100 to 100"
+						value="{imageStyle.brightness}"
+						change="imageStyle.brightness = imageBrightness.value;
+								onChangeImageBrightness()"/>
+
+				</mx:HBox>
+			</mx:VBox>
+
+
+			<!-- IMAGE CONTRAST -->
+			<mx:VBox id="contrastBox" name="Image Contrast" width="100%" 
+				icon="{Globals.g_assets.ImageContrastIcon}"
+				toolTip="Image Contrast"
+				styleName="CloudTool"
+				showEffect="cloudToolShow"
+				hideEffect="cloudToolHide">
+
+				<mx:Label text="{this.label}" styleName="CloudToolLabel" />
+				<mx:HBox styleName="CloudSubTool">
+
+					<mx:HSlider id="imageContrast"
+						minimum="-100" maximum="100" width="150"
+						liveDragging="true" snapInterval="1"
+						tickInterval="10" tickColor="0x000000" tickThickness="1"
+						labels="['-100','0','100']"
+						toolTip="Select the Contrast from -100 to 100"
+						value="{imageStyle.contrast}"
+						change="imageStyle.contrast = imageContrast.value;
+								onChangeImageContrast()"/>
+
+				</mx:HBox>
+			</mx:VBox>
+
+
+
+			<!-- IMAGE CROP TOOL -->
+			<mx:VBox id="cropBox" name="Crop Image" width="100%"
+				horizontalGap="0"
+				icon="{Globals.g_assets.ImageCropIcon}"
+				toolTip="Image Cropping"
+				styleName="CloudTool"
+				showEffect="cloudToolShow"
+				hideEffect="cloudToolHide">
+
+				<mx:Label text="{this.label}" styleName="CloudToolLabel" />
+				<mx:HBox styleName="CloudSubTool">
+
+					<mx:Button id="cropModeBtn" toggle="true" 
+						label="Crop Mode"
+						toolTip="Image Crop Mode"
+						selected="false"
+						change="onChangeCropModeBtn()"/>
+
+				</mx:HBox>
+			</mx:VBox>
+
+
+			<!-- IMAGE FLIP TOOL -->
+			<mx:VBox id="flipBox" name="Flip and Rotate Image" width="100%" 
+				icon="{Globals.g_assets.ImageFlipHorIcon}"
+				toolTip="Image Flipping/Rotation"
+				styleName="CloudTool"
+				showEffect="cloudToolShow"
+				hideEffect="cloudToolHide">
+
+				<mx:Label text="{this.label}" styleName="CloudToolLabel" />
+				<mx:HBox styleName="CloudSubTool">
+
+					<mx:ButtonBar id="imageFlip" 
+						buttonWidth="28" buttonHeight="28" 
+						itemClick="onClickFlipImage(event.item.name == 'hori' ? true : false)">
+						<mx:Object name="hori" icon="{Globals.g_assets.ImageFlipHorIcon}" toolTip="Flip image horizontally"/>
+						<mx:Object name="vert" icon="{Globals.g_assets.ImageFlipVertIcon}" toolTip="Flip image vertically"/>
+					</mx:ButtonBar>
+	
+					<mx:ButtonBar id="imageRotate90"
+						buttonWidth="28" buttonHeight="28" 
+						itemClick="onClickRotateImage90(event.item.name == 'cw' ? true : false)">
+						<mx:Object name="cw" icon="{Globals.g_assets.ImageRotate90CWIcon}" toolTip="Rotate the image 90 degree Clock-Wise"/>
+						<mx:Object name="ccw" icon="{Globals.g_assets.ImageRotate90CCWIcon}" toolTip="Rotate the image 90 degrees Counter Clock-Wise"/>
+					</mx:ButtonBar>
+	
+					<mx:CheckBox id="resizeCanvasCheck" label="Resize Canvas:"
+						selected="{imageStyle.resizeCanvas}"
+						change="{imageStyle.resizeCanvas = resizeCanvasCheck.selected}"/>
+
+				</mx:HBox>
+			</mx:VBox>
+
+
+			<!-- IMAGE EFFECT -->
+			<mx:VBox id="effectBox" name="Image Effect" width="100%" 
+				icon="{Globals.g_assets.ColorPickerIcon}"
+				toolTip="Image Effect"
+				styleName="CloudTool"
+				showEffect="cloudToolShow"
+				hideEffect="cloudToolHide">
+
+				<mx:Label text="{this.label}" styleName="CloudToolLabel" />
+				<mx:HBox styleName="CloudSubTool">
+
+					<!-- EFFECT -->
+					<cloudControls:EffectControl id="effectControl" />
+
+				</mx:HBox>
+			</mx:VBox>
+
+		</mx:ViewStack>
+
+	</mx:VBox>
+
+
+	<!-- BROWSE/SHARE IMAGE CLOUD BUTTONS -->
+	<mx:VBox width="64" height="100%"
+		horizontalAlign="center" verticalAlign="bottom"
+		paddingBottom="20">
+
+		<mx:Button id="browseButton" width="30" height="30"
+			icon="{Globals.g_assets.TriCloudIcon16}" 
+			toolTip="Browse/Search Images in the Cloud Library"
+			click="onClickBrowse()"/>
+
+		<mx:Button id="shareImageBtn" width="30" height="30"
+			icon="{Globals.g_assets.ShareIcon}"
+			toolTip="Share this Image"
+			click="onClickShareImage(); // Dislpay Button only if Brush's remoteID == '0'"/>
+
+	</mx:VBox>
+
+
+</cloudType:CloudToolPanel>

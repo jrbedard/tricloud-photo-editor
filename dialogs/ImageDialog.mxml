@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:cloudControls = "controls.*"
+	layout="vertical"
+	width="500" height="500"
+	minWidth="100" minHeight="100"
+	titleIcon="{Globals.g_assets.ImagePreview}"
+	title="Image Preview :  ''{sourceName}''"
+	horizontalScrollPolicy="auto" verticalScrollPolicy="auto"
+	showCloseButton="true"
+
+	styleName="CloudDialog"
+	titleStyleName="CloudDialogTitle"
+	horizontalAlign="center" verticalAlign="middle"
+	paddingTop="0" verticalGap="0" borderThicknessTop="0"
+
+	creationComplete="onCreationComplete()">
+
+
+	<mx:Script>
+    <![CDATA[
+
+		import mx.controls.Alert;
+		import mx.core.UIComponent;
+		import mx.events.ItemClickEvent;
+		import mx.managers.PopUpManager;
+
+		import core.CanvasCloud;
+		import image.ExportDialog;
+
+	
+		// Static instance, singleton
+		public static const imagePreviewDialog:ImageDialog = new ImageDialog();
+
+		// Modal Image exporter dialog
+		private const imageExportDialog:ExportDialog = ExportDialog.imageExportDialog;
+
+		// Modal Image Email
+		private const emailDialog:EmailDialog = EmailDialog.emailDialog;
+
+		// Modal Image Print
+		private const printDialog:PrintDialog = PrintDialog.printDialog;
+
+
+
+
+		[Bindable]
+		public var previewBitmap:Bitmap = null;
+
+		[Bindable]
+		private var sourcePanel:UIComponent = null;
+
+		[Bindable]
+		private var sourceType:String = '';
+
+		[Bindable]
+		private var sourceName:String = '';
+
+		[Bindable]
+		private var showImageOps:Boolean = false;
+
+
+		private var initCursorGrip:Point = null;
+
+
+		private function onCreationComplete():void
+		{
+			// Set the Right Click menu for this Dialog
+   			var rightClickMenu:RightClickMenu = new RightClickMenu(this.title);
+   			this.contextMenu = rightClickMenu.triCloudContextMenu;
+		}
+
+
+		public function init(sourcePanel:UIComponent, sourceName:String, showImageOps:Boolean):void
+		{
+			this.sourcePanel = sourcePanel;
+			this.sourceName = sourceName;
+
+			this.width = CanvasCloud(sourcePanel).usWidth + 150;
+			this.height = CanvasCloud(sourcePanel).usHeight + 150;
+
+			// Make sure the dialog is not wider or taller than the whole application
+			this.width = Math.min(this.width, sourcePanel.parentApplication.width);
+			this.height = Math.min(this.height, sourcePanel.parentApplication.height);
+
+			this.showImageOps = showImageOps; // Show or not export, email, print
+
+			CreatePreviewImage();
+		}
+
+
+		private function CreatePreviewImage():void
+		{
+			if(!sourcePanel)
+				return;
+
+			var bmpData:BitmapData = new BitmapData(CanvasCloud(sourcePanel).usWidth, 
+													CanvasCloud(sourcePanel).usHeight, true, 0);
+
+		    var previewMat:Matrix = new Matrix();
+		    previewMat.identity(); // no scaling
+
+		    bmpData.draw(sourcePanel, previewMat); // Draw to BitmapData
+
+			previewBitmap = new Bitmap(bmpData, 'auto', true); // Create Bitmap
+
+			imageInfo.text = "Dimensions: " + previewBitmap.width + "x" + previewBitmap.height;
+			
+			//other Info: Grey Border wont appear in image
+		}
+
+
+		private function onCompleteImageLoad():void
+		{
+			this.horizontalScrollPosition = this.maxHorizontalScrollPosition/2;
+			this.verticalScrollPosition = this.maxVerticalScrollPosition/2;
+		}
+
+
+
+		private function onItemClickImageOps(event:ItemClickEvent):void
+		{
+			if(event.item.name == 'export') // export image
+			{
+				PopUpManager.addPopUp(imageExportDialog, this.parentApplication as DisplayObject, true);
+				imageExportDialog.init(CanvasCloud(sourcePanel));
+				PopUpManager.centerPopUp(imageExportDialog); // Center Image dialog
+			}
+			else if(event.item.name == 'email') // email image
+			{
+				PopUpManager.addPopUp(emailDialog, this.parentApplication as DisplayObject, true);
+				emailDialog.Init(CanvasCloud(sourcePanel));
+				PopUpManager.centerPopUp(emailDialog); // Center Image dialog	
+			}
+			else if(event.item.name == 'print') // print image
+			{
+				PopUpManager.addPopUp(printDialog, this.parentApplication as DisplayObject, true);
+				printDialog.Init(CanvasCloud(sourcePanel));
+				PopUpManager.centerPopUp(printDialog); // Center Image dialog
+			}
+
+			// Close this window
+			onClickOk();
+		}
+
+
+		private function onClickOk():void
+		{
+			sourcePanel = null; // free memory
+			previewBitmap = null; // free memory
+			this.dispatchEvent(new Event('close'));	
+		}
+
+
+    ]]>
+    </mx:Script>
+
+
+	<mx:HBox width="100%" paddingTop="0">
+		<mx:Label text="Zoom 100%" />
+		<mx:Label id="imageInfo" />
+	</mx:HBox>
+
+
+	<mx:Box borderStyle="solid">
+		<!-- IMAGE PREVIEW -->
+		<mx:Image id="previewImage" source="{previewBitmap}"
+			scaleContent="false"
+			maintainAspectRatio="true"
+			horizontalAlign="center" verticalAlign="middle"
+			creationComplete="onCompleteImageLoad()"/>
+	</mx:Box>
+
+
+	<!-- CONTROL BAR -->
+	<mx:ControlBar width="100%" horizontalAlign="left" paddingRight="30" >
+
+		<mx:ButtonBar id="imageOps" direction="horizontal"
+			visible="{showImageOps}"
+			paddingLeft="25"
+			itemClick="onItemClickImageOps(event)">
+				<mx:Object name="export" icon="{Globals.g_assets.newThumbIcon}" toolTip="Export the Image" />
+				<mx:Object name="email" icon="{Globals.g_assets.EmailIcon}" toolTip="Email the Image" />
+				<mx:Object name="print" icon="{Globals.g_assets.PrintIcon}" toolTip="Print the Image" />
+		</mx:ButtonBar>
+
+		<mx:Spacer width="100%"/>
+
+		<mx:Button id="okButton" label="Ok" click="onClickOk()" styleName="OkButton" />
+
+	</mx:ControlBar>
+
+
+</mx:TitleWindow>

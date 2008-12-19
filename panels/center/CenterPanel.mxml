@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Panel xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:panels="panels.*" xmlns:centerPanels="panels.center.*"
+	xmlns:cloudControls="controls.*"
+	layout="absolute"
+	clipContent="true"
+	horizontalScrollPolicy="off" verticalScrollPolicy="off"
+
+	styleName="CloudPanel"
+	borderThicknessTop="10" borderThicknessLeft="10" borderThicknessRight="10" borderThicknessBottom="10"
+
+    creationComplete="onCreationComplete()"
+	mouseWheel="onMouseWheel(event)">
+
+
+	<mx:Script>
+    <![CDATA[
+
+		import flash.events.MouseEvent;
+
+
+		private function onCreationComplete():void
+		{
+			
+		}
+
+
+		public function init():void
+       	{
+       		designView.init();
+
+       		topPanel.init(designView.canvas);
+       		bottomPanel.init();
+        }
+
+
+		
+        // MOUSE EVENTS
+        // *********************************** 
+        protected function onMouseWheel(event:MouseEvent):void
+        {
+			zoomControl.mouseWheel(event.delta);	
+        }
+
+
+	]]>
+    </mx:Script>
+
+
+	<centerPanels:DesignView id="designView" width="100%" height="100%"/>
+
+	<centerPanels:TopPanel id="topPanel" x="0" y="-22" width="100%" height="50" />
+
+	<centerPanels:BottomPanel id="bottomPanel" x="0" width="100%" height="113" />
+
+
+
+	<cloudControls:PanControl id="panControl" 
+		x="10" y="{this.height/2 - panControl.height/2}" 
+		target="{designView.canvas}" />
+
+	<cloudControls:ZoomControl id="zoomControl" 
+		x="{this.width - zoomControl.width - 25}" y="{this.height/2 - zoomControl.height/2}" 
+		target="{designView.canvas}" panControl="{panControl}" />
+
+
+
+</mx:Panel>

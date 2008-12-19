@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="utf-8"?>
+<core:Cloud xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:core="core.*" xmlns:cloudType="type.*" xmlns:cloudTypeText="type.text.*"
+	width="150"
+	height="75"
+
+	creationComplete="onCreationComplete()">
+
+
+	<mx:Script>
+    <![CDATA[
+
+		import type.text.TextTag;
+		import type.text.TextStyle;
+
+
+		// Dont bind
+		[Bindable]
+		public var text:String = 'Text'; // the Text itself
+
+		[Bindable]
+		public var textStyle:TextStyle = new TextStyle(); // Text Style
+
+
+
+
+		private function onCreationComplete():void
+		{
+			
+		}
+
+
+		// Clone TextCloud
+		public override function clone():Cloud
+		{
+			var textCloud:TextCloud = super.clone() as TextCloud;
+			if(textCloud && textStyle)
+			{
+				textCloud.text = this.text;
+				textCloud.textStyle = this.textStyle.clone();
+			}
+
+			return textCloud;
+		}
+
+
+		// Save textCloud XML
+		public override function Save():XML
+		{
+			var cloudXML:XML = super.Save();
+			var textCloudXML:XML = new XML("<textCloud></textCloud>"); // Create textCloud XML
+
+			textCloudXML.@text = this.text;
+
+			var textStyleXML:XML = textStyle.Save(); // Save text style
+			textCloudXML.appendChild(textStyleXML);
+
+			cloudXML.appendChild(textCloudXML); // add textCloud XML to coud XML
+			return cloudXML;
+		}
+		
+
+		// Load textCloud XML
+		public override function Load(cloudXML:XML):void
+		{
+			super.Load(cloudXML);
+			var textCloudXML:XML = (cloudXML..textCloud)[0];
+			if(textCloudXML)
+			{
+				this.text = textCloudXML.@text;
+
+				this.textStyle.Load(textCloudXML); // Load textStyle
+			}
+		}
+
+
+
+
+		override public function UpdateIconBitmap():void
+		{
+			super.UpdateIconBitmap();
+		}
+
+
+
+		override protected function measure():void
+		{
+			super.measure();
+		}
+
+
+		public override function GetBitmapData():BitmapData
+		{
+			var bmpData:BitmapData = new BitmapData(this.width, this.height, true, 0);
+			var sourceMat:Matrix = new Matrix();
+			bmpData.draw(this, sourceMat); // Draw textCloud to BitmapData
+			return bmpData;
+		}
+		public override function SetBitmapData(bmpData:BitmapData):void
+		{
+			trace('SetBitmapData for a text Cloud is impossible, shouldnt come here');
+		}
+
+
+		// RENDERER
+        // ***********************************
+        override protected function updateDisplayList(unscaledWidth:Number, unscaledHeight:Number):void
+        {
+            super.updateDisplayList(unscaledWidth, unscaledHeight);
+        }
+
+
+		private function onChangeTextArea(event:Event):void
+		{
+			this.text = textTag.text; // No htmlText, it is buggy
+
+			this.validateNow(); // I love this method!, real time resizing
+
+			// Update icon Image
+			//this.UpdateIconBitmap();
+		}
+
+
+	]]>
+    </mx:Script>
+
+
+	<!-- SEE TextTag !! -->
+	<cloudTypeText:TextTag id="textTag" width="100%" height="100%"
+		minWidth="150" minHeight="75"
+		text="{this.text}"
+		textStyle="{this.textStyle}"
+		change="onChangeTextArea(event)"/>
+	
+</core:Cloud>
+

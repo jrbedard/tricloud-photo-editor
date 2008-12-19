@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml" 
+	width="100%" height="100%"
+
+ 	styleName="ImageService"
+
+	creationComplete="onCreationComplete()">
+
+
+	<mx:Script>
+    <![CDATA[
+
+    	import mx.controls.Image;
+		import mx.controls.Alert;
+		import mx.controls.ProgressBar;
+		import mx.controls.SWFLoader;
+		import mx.managers.CursorManager;
+
+
+    	private var fileRef:FileReference = new FileReference(); // For image upload
+
+
+		[Bindable]
+		public var progressBar:ProgressBar = null;
+
+
+		[Bindable]
+		public var imageLoader:SWFLoader = null;
+
+
+
+		private function onCreationComplete():void
+		{
+			fileRef.addEventListener(Event.SELECT, onSelectFile); // listen for "ok" click 
+
+			// upload progress
+			fileRef.addEventListener(Event.OPEN, onUploadStarted);
+			fileRef.addEventListener(ProgressEvent.PROGRESS, onUploadProgress);
+			fileRef.addEventListener(Event.COMPLETE, onUploadCompleted);
+
+			// upload errors
+			fileRef.addEventListener(SecurityErrorEvent.SECURITY_ERROR, onSecurityError);
+			fileRef.addEventListener(HTTPStatusEvent.HTTP_STATUS, onHttpError);
+			fileRef.addEventListener(IOErrorEvent.IO_ERROR, onIOError);
+		}
+
+
+
+		// Browse the image file to upload
+		private function onClickLocalBrowse():void
+		{
+			var imageTypes:FileFilter = new FileFilter("Images (*.jpg, *.jpeg, *.gif, *.png, *.svg)", "*.jpg; *.jpeg; *.gif; *.png; *.svg");
+			var allTypes:Array = new Array(imageTypes);
+
+			var bSucc:Boolean = fileRef.browse(allTypes); // Browse local file system
+			if(!bSucc)
+			{
+				CloudAlert.show("Error opening the file browser", "Image Import");
+			}
+		}
+
+
+		// On image file selected
+		private function onSelectFile(event:Event):void
+		{
+			// TODO : Validate size
+			if(fileRef.size < 1048576*2) // 2 Megs
+			{
+				UploadFile(); // 1) Upload the image File
+			}
+			else
+			{
+				CloudAlert.show("File too Big!", "File Upload");
+			}
+		}
+
+
+		// Upload the File
+		private function UploadFile():void
+		{
+			// UPLOAD
+			var request:URLRequest = new URLRequest(Globals.UPLOAD_TEMP_IMAGE);
+		    request.method = URLRequestMethod.POST;
+
+		    try
+		    {
+		       	fileRef.upload(request); // Upload file
+		    }
+		    catch(error:Error)
+		    {
+		        CloudAlert.show("Unable to upload file.", "File Upload");
+		    }
+		}
+
+
+		// Upload PROGRESS
+		private function onUploadStarted(event:Event):void
+		{
+			CursorManager.setBusyCursor();
+
+			progressBar.visible = true;
+			progressBar.setProgress(0, fileRef.size);
+		}
+
+		private function onUploadProgress(event:ProgressEvent):void
+		{
+			progressBar.setProgress(event.bytesLoaded, event.bytesTotal);
+			progressBar.label = "Uploading '" + fileRef.name + "' " + 
+				Globals.GetFileSize(event.bytesLoaded) + "/" + Globals.GetFileSize(event.bytesTotal) + " bytes...";
+		}
+
+		// Upload Completed
+		private function onUploadCompleted(event:Event):void
+		{
+		   	// CloudAlert.show("uploaded");
+			imageLoader.source = Globals.TEMP_IMAGES_PATH + fileRef.name;
+			
+			progressBar.visible = false;
+		   	CursorManager.removeBusyCursor();
+		}
+
+
+
+
+
+		// Upload ERRORS
+		private function onSecurityError(securityErrorEvent:SecurityErrorEvent):void
+		{
+			progressBar.visible = false;
+		   	CursorManager.removeBusyCursor();
+			CloudAlert.show(securityErrorEvent.text, "Security Error");
+		}
+		private function onHttpError(httpStatusEvent:HTTPStatusEvent):void
+		{
+			progressBar.visible = false;
+		   	CursorManager.removeBusyCursor();
+			CloudAlert.show(httpStatusEvent.type, "Http Error");
+		}
+		private function onIOError(ioErrorEvent:IOErrorEvent):void
+		{
+			progressBar.visible = false;
+		   	CursorManager.removeBusyCursor();
+			CloudAlert.show(ioErrorEvent.text, "IO Error");
+		}
+
+
+    ]]>
+    </mx:Script>
+
+
+	<mx:Label id="importLabel" text="Import an Image from my local hard drive." fontStyle="italic" />
+
+	<mx:HBox horizontalAlign="left" verticalAlign="middle">	
+		<mx:Label text="Choose Image file:" />
+		<mx:Button id="browseBtn" label="Browse..." 
+			icon="{Globals.g_assets.AddTagIcon}"
+			click="onClickLocalBrowse()" />
+	</mx:HBox>
+
+</mx:VBox>

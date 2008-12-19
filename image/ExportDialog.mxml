@@ -1,0 +1,331 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:cloudPanels="panels.*" xmlns:image="image.*" xmlns:cloudDialogs="dialogs.*"
+	xmlns:imageService="image.services.*" xmlns:cloudControls="controls.*"
+	width="600" height="600"
+	maxWidth="600" maxHeight="600"
+	titleIcon="{Globals.g_assets.ImageExporter}"
+	title="Image Exporter"
+	layout="vertical"
+	horizontalScrollPolicy="off" verticalScrollPolicy="off"
+	showCloseButton="true"
+
+	styleName="CloudDialog"
+	titleStyleName="CloudDialogTitle"
+
+	creationComplete="onCreationComplete()"
+	close="onClickCancel()">
+
+
+	<mx:Script>
+    <![CDATA[
+    	import mx.controls.Alert;
+    	import mx.controls.ProgressBar;
+    	import mx.rpc.remoting.RemoteObject;
+        import mx.rpc.events.*;
+		import mx.managers.PopUpManager;
+    	import mx.managers.CursorManager;
+
+		import com.adobe.images.PNGEnc;
+		import com.adobe.images.JPGEncoder;
+
+    	import core.CanvasCloud;
+
+
+		// Static instance, singleton
+		public static const imageExportDialog:ExportDialog = new ExportDialog();
+
+
+		[Bindable]
+		private var canvas:CanvasCloud = null;
+
+		[Bindable]
+		private var destBytes:ByteArray = new ByteArray();
+
+		[Bindable]
+		private var fileType:String = 'jpg'; // Selected exported fileType
+
+		// RoR RO
+        private var tempFileRemObj:RemoteObject = new RemoteObject(); // To save temp image on the server
+
+		[Bindable]
+		private var serverTempImagePath:String = ''; // name of the temp image path on the server
+
+		[Bindable]
+		private var suggestedFileName:String = "image";
+
+
+
+		private function onCreationComplete():void
+		{
+			// Set the Right Click menu for this Dialog
+   			var rightClickMenu:RightClickMenu = new RightClickMenu(this.title);
+   			this.contextMenu = rightClickMenu.triCloudContextMenu;
+
+			tempFileRemObj.destination = "TempFileService";
+        	tempFileRemObj.saveTempImage.addEventListener("result", onResultSaveTempImage);
+
+			tempFileRemObj.addEventListener("fault", onFault);
+		}
+
+
+		// Init Export Dialog
+		public function init(canvas:CanvasCloud):void
+		{
+			this.width = Math.min(maxWidth, this.parentApplication.width);
+    		this.height = Math.min(maxHeight, this.parentApplication.height);
+
+			if(!canvas)
+			{
+				CloudAlert.show('Error: Invalid Canvas','Export');
+				return;
+			}	
+			this.canvas = canvas;
+
+			if(imagePreview)
+				imagePreview.init();
+
+			// ReInit ProgressBar
+			if(progressBar)
+			{
+				progressBar.visible = false;
+				progressBar.setProgress(0, 0);
+			}
+
+			// simulate change file type
+			onChangeFileType(new Event('change'))
+		}
+
+
+		// Changed file type
+		private function onChangeFileType(event:Event):void
+		{
+			// Set destination Image
+			var bmpData:BitmapData = new BitmapData(canvas.usWidth, canvas.usHeight, true, 0);
+
+			var destMat:Matrix = new Matrix(); // Identity
+		    bmpData.draw(canvas, destMat); // Draw to BitmapData
+
+
+			fileTypeViewStack.selectedIndex = fileTypeCombo.selectedIndex;
+
+			fileType = fileTypeCombo.selectedItem.name;
+			if(fileType == 'jpg')
+			{
+				var jpgEnc:JPGEncoder = new JPGEncoder(jpgQualitySlider.value);
+				destBytes = jpgEnc.encode(bmpData);
+			}
+			else if(fileType == 'png')
+			{
+				destBytes = PNGEnc.encode(bmpData);
+			}
+
+// Is there a way to keep it local???? Fauxto does it...
+/*
+			
+			
+*/
+		}
+
+
+		// Called by Image export services
+		public function SaveTempImageOnServer():void
+		{
+			tempFileRemObj.saveTempImage(destBytes, fileType); // Save image BitmapData on the back-end
+
+			progressBar.visible = true;
+			CursorManager.setBusyCursor();
+		}
+
+
+		// Remote object handlers
+		// ------------------------------
+		private function onResultSaveTempImage(event:ResultEvent):void 
+    	{
+    		CursorManager.removeBusyCursor();
+    		progressBar.setProgress(50, 100);
+			progressBar.label = "Saved Image data "; //" + m_cloud.name + "'";			
+
+    		serverTempImagePath = event.result as String;
+    		
+			this.dispatchEvent(new Event('tempImageSaved'));
+    	}
+
+
+		private function onFault(event:FaultEvent):void 
+        {
+            CursorManager.removeBusyCursor(); // Remove the busy cursor
+			progressBar.visible = false;
+
+            CloudAlert.show(event.fault.faultString, 'Error');
+        }
+
+
+
+
+		private function dataTipFunc(val:String):String
+		{
+			return val + '%';
+		}
+
+
+		private function onClickExport():void
+		{
+			CursorManager.removeBusyCursor();
+			imagePreview.Close();
+			PopUpManager.removePopUp(imageExportDialog);
+		}
+
+		private function onClickCancel():void
+		{
+			CursorManager.removeBusyCursor();
+			imagePreview.Close();
+			PopUpManager.removePopUp(imageExportDialog);
+		}
+
+ 	]]>
+    </mx:Script>
+
+
+	<mx:HBox width="100%"
+		horizontalAlign="left" verticalAlign="middle"
+		paddingLeft="20" paddingTop="20" paddingBottom="20"
+		borderStyle="solid">
+
+		<!-- SOURCE IMAGE THUMB -->
+		<cloudDialogs:ImagePreview id="imagePreview" 
+			sourcePanel="{canvas}" 
+			iconWidth="100" iconHeight="100"/>
+
+
+		<!-- IMAGE FILE-->		
+		<mx:Form id="imageFileInfo"
+			horizontalScrollPolicy="off" verticalScrollPolicy="off"
+			verticalGap="3"
+			paddingLeft="5" paddingTop="15" paddingBottom="5" paddingRight="5">
+
+			<mx:FormItem label="Width:">
+				<mx:Label text="{canvas.usWidth.toFixed(0)} pixels" />
+			</mx:FormItem>
+
+			<mx:FormItem label="Height:">
+				<mx:Label text="{canvas.usHeight.toFixed(0)} pixels" />
+			</mx:FormItem>
+
+			<mx:FormItem label="Size:">
+				<mx:Label text="{Globals.GetFileSize(destBytes.length)}" />
+			</mx:FormItem>
+		</mx:Form>
+
+
+		<!-- DESTINATION IMAGE FILE-->		
+		<mx:VBox id="destFileType" verticalAlign="middle">
+
+			<mx:HBox width="100%"
+				horizontalAlign="left" verticalAlign="middle">
+				<mx:Label text="File Format:"/>
+
+				<mx:ComboBox id="fileTypeCombo" 
+					change="onChangeFileType(event);">
+					<mx:Array id="fileTypes">
+						<mx:Object name="jpg" label="JPG" toolTip="JPG file" />
+						<mx:Object name="png" label="PNG" toolTip="PNG file" />
+					</mx:Array>
+				</mx:ComboBox>
+			</mx:HBox>
+
+			<mx:ViewStack id="fileTypeViewStack" width="100%"
+				borderStyle="solid">
+
+				<mx:Form id="jpgForm" label="JPG" name="jpg">
+					<mx:FormItem label="JPG Quality:">
+						<mx:HSlider id="jpgQualitySlider" width="120"
+							minimum="0" maximum="100"
+							value="50"
+
+							liveDragging="true" allowTrackClick="true"
+							snapInterval="1"
+							tickInterval="10" tickColor="0x000000" tickThickness="1"
+							labels="['0%','50%','100%']"
+							toolTip="Select the line thickness from 0 to 60"
+							dataTipFormatFunction="dataTipFunc"
+							dataTipOffset="-2"/>
+					</mx:FormItem>	
+				</mx:Form>
+
+				<mx:Form id="pngForm" label="PNG" name="png">
+					<mx:FormItem label="PNG Transparency:">
+						<mx:CheckBox id="pngTransparency" selected="true" />
+					</mx:FormItem>
+				</mx:Form>
+
+			</mx:ViewStack>
+
+		</mx:VBox>
+
+
+	</mx:HBox>
+
+
+	<!-- IMAGE AND PROGRESS BAR -->
+	<mx:Canvas width="100%">
+		<mx:Image id="downArrow" source="{Globals.g_assets.DownArrow}" 
+			x="{this.width/2 - downArrow.width/2 - 10}" y="0"
+			alpha="{progressBar.visible ? 0.25: 1.0}"  />
+
+		<mx:ProgressBar id="progressBar" width="100%" 
+			x="0" y="0"
+			mode="manual"
+			label="" labelPlacement="top" 
+			enabled="true"
+			visible="false"/>
+	</mx:Canvas>
+
+
+	<!-- IMAGE EXPORT SERVICES -->
+	<mx:TabBar direction="horizontal" height="30"
+		iconField="@icon" labelField="@label"
+		dataProvider="{imageViewStack}" 
+		selectedIndex="0"
+
+		buttonStyleName="ImageServiceButton"
+		borderStyle="solid"
+		paddingLeft="15"/>
+
+	<mx:ViewStack id="imageViewStack" width="100%" height="100%"
+		creationPolicy="all"
+		paddingLeft="10" paddingTop="10" paddingRight="10" paddingBottom="10"
+		borderStyle="solid" cornerRadius="15">
+
+		<imageService:LocalExportPanel id="localImage"
+			label="Local" icon="{Globals.g_assets.LocalImageIcon}"
+			progressBar="{progressBar}"
+			serverTempImagePath="{serverTempImagePath}" suggestedFileName="{suggestedFileName}.{fileType}"
+			toolTip="Save the Image on my local hard drive"/>
+
+		<imageService:CreationPanel id="creationImage"
+		   	label="TriCloud" icon="{Globals.g_assets.TriCloudIcon16}"
+			currentState="export"
+			creationData="{destBytes}" 
+			progressBar="{progressBar}"
+			toolTip="Export the Image to my TriCloud Creation account."/>
+
+		<!--mx:Box id="flickrImage" 
+			label="Flickr" icon="{Globals.g_assets.FlickrImageIcon}"
+			toolTip="Export the Image to Flickr"
+			enabled="true"/>
+
+		<mx:Box id="photoBucketImage" 
+			label="PhotoBucket" icon="{Globals.g_assets.FlickrImageIcon}"
+			toolTip="Export the Image to Photobucket"
+			enabled="true"/-->
+
+	</mx:ViewStack>
+	
+
+	<mx:ControlBar>
+		<mx:Button id="exportButton" label="Ok" click="onClickExport()" styleName="OkButton"/>
+		<mx:Button id="cancelButton" label="Cancel" click="onClickCancel()" styleName="CancelButton"/>		
+	</mx:ControlBar>
+
+</mx:TitleWindow>
+

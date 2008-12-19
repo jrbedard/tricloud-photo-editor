@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:cloudPanels="panels.*" xmlns:cloudControls="controls.*"
+	backgroundColor="0xf5f5f5" 
+   	borderStyle="solid" borderSides="bottom" borderColor="0xc0c0ee" borderThickness="1" cornerRadius="0" 
+   	dropShadowEnabled="false"
+   	paddingLeft="0" paddingBottom="10" paddingTop="10"
+	verticalScrollPolicy="off" horizontalScrollPolicy="off"
+	horizontalAlign="center" verticalAlign="middle">
+
+
+	<mx:Script>
+	<![CDATA[
+
+		import flash.display.BlendMode;
+
+		import core.Cloud;
+		import events.*;
+
+
+
+		[Bindable]
+		private var m_cloud:Cloud = null;
+
+
+		// Blend modes array
+		private const blendModes:Array = [BlendMode.NORMAL, BlendMode.INVERT, BlendMode.HARDLIGHT, 
+										  BlendMode.LIGHTEN, BlendMode.DARKEN,
+										  BlendMode.ADD, BlendMode.SUBTRACT, BlendMode.MULTIPLY, BlendMode.DIFFERENCE,
+										  BlendMode.ALPHA, BlendMode.ERASE,
+										  BlendMode.OVERLAY, BlendMode.SCREEN, BlendMode.LAYER];
+
+
+		// Changed the selected cloud in the cloud tree or canvas
+		public function SetCloud(sCloud:Cloud):void
+		{
+			m_cloud = sCloud;
+		}
+
+		
+		private function onCloudPropertyChange():void
+		{
+			if(!m_cloud)
+				return;
+
+			m_cloud.onCloudFiltersChanged(); // Update Filters
+			// TODO: update modifiers 
+		}
+	]]>
+	</mx:Script>
+
+
+	<mx:Form width="100%" height="100%" 
+		paddingTop="0" paddingLeft="0" paddingRight="0" paddingBottom="0">
+
+		<!-- CLOUD VISIBLE -->
+		<mx:FormItem label="Cloud Visible:" indicatorGap="5">
+			<mx:CheckBox id="cloudVisible" label=""
+			 	toolTip="Set the Cloud visibility"
+			 	selected="{m_cloud.visible}"
+			 	change="m_cloud.visible = cloudVisible.selected;
+			 			onCloudPropertyChange();"/>
+		</mx:FormItem>
+
+		<!-- CLOUD OPACITY -->
+		<mx:FormItem label="Opacity:" indicatorGap="5">
+			<cloudControls:OpacityControl id="cloudAlpha"
+	    		width="110"
+	    		toolTip="Select the Cloud opacity from 0% to 100%"
+	    		value="{m_cloud.alpha}"
+	    		change="m_cloud.alpha = cloudAlpha.value;
+	    				onCloudPropertyChange();"/>
+		</mx:FormItem>
+
+		<!-- CLOUD BLEND MODE -->
+		<mx:FormItem label="Blend Mode:" indicatorGap="5">
+			<mx:ComboBox id="cloudBlendMode" width="95"
+				toolTip="Select the Cloud blend mode"
+				dataProvider="{blendModes}"
+				selectedIndex="{blendModes.indexOf(m_cloud.blendMode)}"
+				change="m_cloud.blendMode = event.target.text;
+						onCloudPropertyChange();"/>
+		</mx:FormItem>
+	</mx:Form>
+
+
+</mx:VBox>
+

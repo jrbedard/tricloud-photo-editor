@@ -1,0 +1,229 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TileList xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:cloudLibrary="library.*" xmlns:panels="panels.*"
+	useRollOver="false"
+  	currentState="{CloudType.ST_IMAGE}"
+  	allowDragSelection="false"
+	dragEnabled="false" dropEnabled="false" dragMoveEnabled="false"
+
+	dataProvider="{metaClouds}"
+	itemRenderer="library.CloudLibraryListItem"
+
+	backgroundColor="0xffffff"
+
+	creationComplete="onCreationComplete()"
+	dataChange="onDataChange()"
+	itemClick="onClickCloudThumb(event)">
+
+
+	<mx:Script>
+    <![CDATA[
+
+        import mx.controls.Alert;
+        import mx.collections.ArrayCollection;
+        import mx.collections.Sort;
+        import mx.collections.SortField;
+        import mx.events.ListEvent;
+        import mx.controls.Menu;
+        import mx.events.MenuEvent;
+        import mx.events.CollectionEvent;
+        import mx.events.CollectionEventKind;
+        import mx.collections.XMLListCollection;
+
+ 
+ 
+		[Bindable]
+		public var metaClouds:XMLListCollection = null; // MetaCloud XML list for CloudLibraryList
+
+
+		// "SortBy" state
+ 		public var thumbDisplayState:String = "name";
+
+
+		private var metaCloudMenu:Menu = null;
+
+
+
+
+		private function onCreationComplete():void
+		{
+			// On click on a cloud button on a library list item
+			this.addEventListener('cloudButtonClick', onClickCloudMenuButton);
+
+			metaCloudMenu = Menu.createMenu(this, metaCloudMenuData,  false);
+			metaCloudMenu.iconFunction = cloudMenuIconFunction;
+			metaCloudMenu.labelField = "@label";
+			metaCloudMenu.styleName = "CloudMenu";
+			metaCloudMenu.addEventListener("itemClick", onClickItemMetaCloudMenu);
+
+			// Set the Right Click menu for the Menu
+   			var rightClickMenu:RightClickMenu = new RightClickMenu("TriCloud");
+   			metaCloudMenu.contextMenu = rightClickMenu.triCloudContextMenu;
+
+			// On Filter Cloud Type
+			this.parent.addEventListener("filter", onFilterMetaClouds); // filter cloud proxies
+		}
+
+
+		public function SetMetaClouds(metaCloudList:XMLList):void
+		{
+			if(metaClouds)
+			{
+				metaClouds.removeAll();
+				metaClouds = null;
+			}
+
+			this.metaClouds = new XMLListCollection(metaCloudList);
+			this.validateNow();
+		}
+
+
+
+
+		// FILTER library
+		private function onFilterMetaClouds(event:CloudLibraryBrowseEvent):void
+		{
+			setCurrentState(event.itemType);
+		}
+
+
+		private function onDataChange():void
+		{
+			
+		}
+
+
+		public function sort(field:String, live:Boolean):void
+        {
+/*        	
+        	var sort:Sort = new Sort();
+        	sort.fields = [new SortField(field, true, true)]; // sorting field
+
+        	// Apply the sort to the collection.
+        	metaCloudArray.sort = sort;
+
+        	// Change thumb display state
+        	for each(var metaCloud:MetaCloud in metaCloudArray)
+        	{
+        		metaCloud.displayState = field;
+        	}
+
+       		metaCloudArray.refresh();
+*/
+        }
+
+        public function filter(itemType:String, live:Boolean):void
+        {
+
+	
+        }
+
+        //return the last effect so we could add effectEnd handler if desired
+        private function fadeInThumbnails():void
+		{
+
+        }
+
+
+		// Clicked Meta Cloud Thumb
+		private function onClickCloudThumb(event:ListEvent):void
+        {
+            var metaCloud:XML = this.selectedItem as XML;
+            if(!metaCloud)
+            	return;
+
+            // repeat to the CloudLibrary is notified to update the MetaPanel
+            this.dispatchEvent(new MetaCloudEvent("metaCloudClick", metaCloud));
+        }
+
+
+		// Clicked on the button on the meta cloud thumb
+		private function onClickCloudMenuButton(event:CloudLibraryListItemEvent):void
+		{
+			metaCloudMenu.show(event.mousePos.x - 20, event.mousePos.y); // Show Cloud menu
+		}
+
+
+		// Clicked on an item in the meta cloud menu
+		private function onClickItemMetaCloudMenu(event:MenuEvent):void
+		{
+			var itemName:String = event.item.@name;
+			var metaCloud:XML = this.selectedItem as XML;
+
+			// notify the CloudLibrary that we want download, delete, flag, etc the cloud
+           	this.dispatchEvent(new MetaCloudEvent(itemName, metaCloud));			
+		}
+
+
+		private function cloudMenuIconFunction(item:Object):Class
+		{
+			var itemName:String = item.@name;
+
+			switch(itemName)
+			{
+				case "viewCloud":
+					return Globals.g_assets.MagnifyIcon;
+					break;
+				case "downloadCloud":
+					return Globals.g_assets.NewDrawCloudIcon;
+					break;
+				case "favoriteCloud":
+					return Globals.g_assets.StarIcon;
+					break;
+				case "commentCloud":
+					return Globals.g_assets.CommentIcon;
+					break;
+				case "flagCloud":
+					return Globals.g_assets.FlagIcon;
+					break;
+			}
+			return null;
+		}
+		
+
+	]]>
+    </mx:Script>
+
+
+	<mx:XML id="metaCloudMenuData">
+        <root>
+        	<menuitem name="viewCloud" label="View Cloud" toolTip="View Cloud Page"/>
+        	<menuitem name="downloadCloud" label="Download Cloud" toolTip="Download the selected Cloud"/>
+            <menuitem type="separator"/>
+            <menuitem name="commentCloud" label="Add a Comment" toolTip="Add a Comment to this Cloud"/>
+            <menuitem name="flagCloud" label="Flag as innapropriate" toolTip="Flag Cloud as innapropriate"/>
+            <menuitem name="favoriteCloud" label="Add to my favorites" toolTip="Add this cloud to my Favorite"/>
+        </root>
+    </mx:XML>
+
+
+
+	<mx:states>
+
+		<mx:State name="{CloudType.ST_IMAGE}">
+			<mx:SetProperty target="{this}" name="columnWidth" value="150" />
+			<mx:SetProperty target="{this}" name="rowHeight" value="150" />
+		</mx:State>
+
+		<mx:State name="{CloudType.ST_FONT}">
+			<mx:SetProperty target="{this}" name="columnWidth" value="150" />
+			<mx:SetProperty target="{this}" name="rowHeight" value="100" />
+		</mx:State>
+
+		<mx:State name="{CloudType.ST_BRUSH}">
+			<mx:SetProperty target="{this}" name="columnWidth" value="180" />
+			<mx:SetProperty target="{this}" name="rowHeight" value="100" />
+		</mx:State>
+
+		<mx:State name="{CloudType.ST_SHAPE}">
+		</mx:State>
+
+		<mx:State name="{CloudType.ST_GRADIENT}">
+		</mx:State>
+
+		<mx:State name="{CloudType.ST_EFFECT}">
+		</mx:State>
+		
+	</mx:states>
+
+
+</mx:TileList>

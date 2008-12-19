@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Button xmlns:mx="http://www.adobe.com/2006/mxml" 
+	width="50" height="50"
+	buttonMode="true"
+
+	selectedUpSkin="controls.skins.CreateCloudButtonSkin"
+	selectedOverSkin="controls.skins.CreateCloudButtonSkin"
+	upSkin="controls.skins.CreateCloudButtonSkin"
+	overSkin="controls.skins.CreateCloudButtonSkin"
+	downSkin="controls.skins.CreateCloudButtonSkin"
+	selectedDownSkin="controls.skins.CreateCloudButtonSkin"
+	disabledSkin="controls.skins.CreateCloudButtonSkin"
+	selectedDisabledSkin="controls.skins.CreateCloudButtonSkin"
+	>
+
+	<mx:Script>
+    <![CDATA[
+
+		
+
+
+	]]>
+    </mx:Script>
+
+</mx:Button>

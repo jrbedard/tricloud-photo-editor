@@ -1,0 +1,261 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Button xmlns:mx="http://www.adobe.com/2006/mxml"
+	width="48" height="48"
+	buttonMode="true"
+
+	selectedUpSkin="controls.colorClasses.ColorButtonSkin"
+	selectedOverSkin="controls.colorClasses.ColorButtonSkin"
+	upSkin="controls.colorClasses.ColorButtonSkin"
+	overSkin="controls.colorClasses.ColorButtonSkin"
+	downSkin="controls.colorClasses.ColorButtonSkin"
+	selectedDownSkin="controls.colorClasses.ColorButtonSkin"
+	disabledSkin="controls.colorClasses.ColorButtonSkin"
+	selectedDisabledSkin="controls.colorClasses.ColorButtonSkin"
+
+
+	creationComplete="onCreationComplete()">
+
+
+	<mx:Metadata>
+        [Event(name="close", type="flash.events.Event")]
+    </mx:Metadata>
+
+
+	<mx:Script>
+    <![CDATA[
+
+    	import mx.containers.Panel;
+		import mx.managers.PopUpManager;
+
+		import controls.colorClasses.*;
+
+
+		// CheckerBoard background
+		private var backgroundBmp:Bitmap = Globals.g_assets.backgroundBmp;
+
+
+		private var colorDialog:ColorDialog = new ColorDialog();
+		private var colorDialogVisible:Boolean = false; // panel open
+
+		private var _title:String = ''; 
+
+
+
+		private var _selectedColor:uint = 0x000000; // color selected
+
+		private var _selectedAlpha:Number = 1.0; // alpha selected
+
+
+		[Bindable]
+		public var gradientSelected:Boolean = false;
+
+		[Bindable]
+		public var selectedGradient:CloudGradient = null;
+		private var gradientMatrix:Matrix = new Matrix();
+
+
+
+
+		private function onCreationComplete():void
+		{
+			DrawColor();
+
+			// listeners
+			colorDialog.addEventListener("colorChange", onChangeColor);
+			colorDialog.addEventListener("alphaChange", onChangeAlpha);
+			colorDialog.addEventListener("gradientChange", onChangeGradient); // change selected gradient
+			colorDialog.addEventListener("gradientParamChange", onChangeGradient); // change selected gradient's parameters
+
+			colorDialog.addEventListener("close", onCloseColorDialog);
+		}
+
+
+
+		[Inspectable(defaultValue='')]
+		public function set title(value:String):void
+		{
+			_title = value;
+			if(colorDialog)
+			{
+				colorDialog.dialogTitle = _title;
+			}
+		}
+		[Bindable]
+		public function get title():String
+		{
+			return _title;
+		}
+
+		
+		// Selected Color
+		[Inspectable(defaultValue=0x000000)]
+		public function set selectedColor(value:uint):void
+		{
+			_selectedColor = value;
+			colorDialog.selectedColor = _selectedColor;
+			DrawColor();
+		}
+		[Bindable]
+		public function get selectedColor():uint
+		{
+			return _selectedColor;
+		}
+
+
+		// Selected Alpha
+		[Inspectable(defaultValue=1.0)]
+		public function set selectedAlpha(value:Number):void
+		{
+			_selectedAlpha = value;
+			colorDialog.selectedAlpha = _selectedAlpha;
+			DrawColor();
+		}
+		[Bindable]
+		public function get selectedAlpha():Number
+		{
+			return _selectedAlpha;
+		}
+
+
+
+		// Gradient Enabled for this ColorControl
+		public function set gradientEnabled(value:Boolean):void
+		{
+			colorDialog.currentState = (value?'solidGradient':'solid');
+		}
+
+		[Bindable]
+		public function get gradientEnabled():Boolean
+		{
+			return (colorDialog.currentState == 'solid'?false:true);
+		}
+
+
+
+		// On solid Color Changed
+		private function onChangeColor(event:ColorEvent):void
+		{
+			selectedColor = event.color;
+			gradientSelected = false;
+			DrawColor();
+
+			this.dispatchEvent(new Event("change")); // the ColorControl has changed (Update active tag's color)
+		}
+
+		// On solid Alpha Changed
+		private function onChangeAlpha(event:ColorEvent):void
+		{
+			selectedAlpha = event.alpha;
+			//gradientSelected = false; // alpha doesnt affect gradient?
+
+			if(gradientSelected)
+				DrawGradient();
+			else
+				DrawColor();
+
+			this.dispatchEvent(new Event("change")); // the ColorControl has changed (Update active tag's color)
+		}
+
+		// On Gradient Changed
+		private function onChangeGradient(event:GradientEvent):void
+		{
+			selectedGradient = event.gradient;
+			gradientSelected = true;
+			DrawGradient();
+
+			this.dispatchEvent(new Event("change")); // the ColorControl has changed (Update active tag's color)
+		}
+
+
+		// Draw checkerboard background to notice alpha here
+		private function DrawBackground():void
+		{
+			this.graphics.clear();
+
+			// button background fill (inside borders)
+			drawRoundRect(
+				1, 1, width - 2, height - 2, getStyle("cornerRadius") - 1,
+				[0xDDDDDD, 0xCCCCCC], 1,
+				verticalGradientMatrix(0, 0, width - 2, height - 2));
+
+			// checkerboard background
+			this.graphics.beginBitmapFill(backgroundBmp.bitmapData);
+			this.graphics.drawRect(4, 4, this.width-8, this.height-8);
+			this.graphics.endFill();
+		}
+
+
+
+		private function DrawColor():void
+		{
+			DrawBackground();
+
+			this.graphics.lineStyle(1, 0x000000, 0.5);
+			this.graphics.beginFill(_selectedColor, _selectedAlpha);
+			this.graphics.drawRect(4, 4, this.width-8, this.height-8);
+			this.graphics.endFill();
+		}
+
+
+		private function DrawGradient():void
+		{
+			DrawBackground();
+
+			this.graphics.lineStyle(1, 0x000000, 0.5);
+
+			gradientMatrix.createGradientBox(this.width-8, this.height-8, selectedGradient.rotation, 4, 4);
+
+			this.graphics.beginGradientFill(selectedGradient.gradientType,
+											selectedGradient.colors,
+											selectedGradient.alphas,
+											selectedGradient.ratios,
+											gradientMatrix,
+											selectedGradient.spreadMethod,
+											selectedGradient.interpolationMethod,
+											selectedGradient.focalPointRatio);
+
+			this.graphics.drawRect(4, 4, this.width-8, this.height-8);
+			this.graphics.endFill();
+		}
+
+
+		protected override function clickHandler(event:MouseEvent):void
+		{		
+			event.stopPropagation(); // Dont continue click event on something below this control
+
+			if(!colorDialogVisible)
+			{
+				CloudDialogManager.OpenDialog(colorDialog, this);
+
+				colorDialogVisible = true;
+				this.mouseEnabled = false;
+
+				colorDialog.dialogTitle = _title;
+
+				// HACK?
+				colorDialog.selectedColor = _selectedColor;
+				colorDialog.selectedAlpha = _selectedAlpha;
+
+				colorDialog.oldColor = _selectedColor;
+				colorDialog.oldAlpha = _selectedAlpha; 
+			}
+
+			super.clickHandler(event);
+		}
+
+
+		private function onCloseColorDialog(event:Event):void
+		{
+			CloudDialogManager.CloseDialog(colorDialog);
+
+			colorDialogVisible = false;
+			this.mouseEnabled = true;
+
+			dispatchEvent(new Event("close"));
+		}
+
+
+    ]]>
+    </mx:Script>
+
+</mx:Button>

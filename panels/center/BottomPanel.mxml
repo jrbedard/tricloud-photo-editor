@@ -1,0 +1,224 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Box xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:cloudPanels="panels.*" xmlns:cloudType ="type.*"
+	y = "{centerPanelBottom}"
+	clipContent="true"
+	currentState="collapsed"
+	verticalScrollPolicy="off" horizontalScrollPolicy="off"
+
+	horizontalAlign="center" verticalAlign="top"
+	verticalGap="0"
+
+	creationComplete="onCreationComplete()"
+	resize="onResize(event)"
+	rollOver="onRollOver()">
+
+
+ 	<mx:Script>
+	<![CDATA[
+		import mx.events.ResizeEvent;
+		import mx.effects.AddChildAction;
+		import mx.effects.easing.Bounce;
+
+		import core.Cloud;
+		import core.CloudController;
+		import type.TextCloud;
+		import type.TextCloudPanel;
+		import type.ImageCloudPanel;
+		import type.DrawCloudPanel;
+		import events.*;
+		import CloudEngine;
+
+
+
+		private var cloudController:CloudController = null; // cloud controller to know which or no cloud is selected
+
+		[Bindable]
+		private var m_cloud:Cloud = null; // active cloud
+
+
+
+		[Bindable]
+		private var centerPanelBottom:int = 9999; // Y position of the bottom of the center panel
+
+
+
+
+		private function onCreationComplete():void
+		{
+			var centerPanel:CenterPanel = CenterPanel(this.parentDocument);
+			if(centerPanel)
+			{
+				centerPanelBottom = centerPanel.y + centerPanel.height; // Compute Center Panel's bottom
+				centerPanel.addEventListener('resize', onResizeCenterPanel);
+			}
+
+			DrawPalette();
+		}
+
+
+		public function init():void
+		{
+			cloudController = CloudEngine.GetInstance().GetCloudController();
+
+			// Listen for selected cloud in the cloud tree or canvas
+			cloudController.addEventListener("selectCloud", onChangeSelectedCloud);
+
+			// Listen on the cloudController that no cloud is selected
+			cloudController.addEventListener("unSelectClouds", onUnSelectClouds);
+		}
+
+
+		// Changed the selected cloud in the cloud tree or canvas
+		private function onChangeSelectedCloud(cloudEvent:CloudEvent):void
+		{
+			if(cloudEvent.m_cloud)
+			{
+				m_cloud = cloudEvent.m_cloud;
+
+				// cloud panel FACTORY
+				if(m_cloud.type == CloudType.IMAGE) // Image
+				{
+					cloudTypePanel.selectedChild = imageCloudPanel;
+					imageCloudPanel.SetCloud(m_cloud);
+				}
+				else if(m_cloud.type == CloudType.TEXT) // Text
+				{
+					cloudTypePanel.selectedChild = textCloudPanel;
+					textCloudPanel.SetCloud(m_cloud);
+				}
+				else if(m_cloud.type == CloudType.DRAW) // Draw
+				{
+					cloudTypePanel.selectedChild = drawCloudPanel;
+					drawCloudPanel.SetCloud(m_cloud);
+				}
+
+				this.setCurrentState("normal");
+			}
+		}
+
+
+		// No cloud is selected on the canvas
+		private function onUnSelectClouds(cloudEvent:CloudEvent):void
+		{
+			// TODO: Dont do that if we're just changing cloud
+			this.setCurrentState("collapsed");
+		}
+
+
+		// Resize Center Panel
+		private function onResizeCenterPanel(event:ResizeEvent):void
+		{
+			var centerPanel:CenterPanel = CenterPanel(this.parentDocument);
+			if(centerPanel)
+			{
+				centerPanelBottom = centerPanel.y + centerPanel.height; // Compute Center Panel's bottom
+
+				if(this.currentState == "normal")
+				{
+					this.y = centerPanelBottom - this.height - 5;
+				}
+			}
+
+			DrawPalette();
+		}
+
+		// Resize Bottom Panel (when the center panel resize)
+		private function onResize(event:ResizeEvent):void
+		{
+			DrawPalette();
+		}
+
+
+
+		// Draw curved background design
+		private function DrawPalette():void
+		{
+/*
+			//var halfSize:uint = Math.round(this.width*0.5);
+			this.graphics.clear();
+			this.graphics.lineStyle(1, 0xAAAAAA, 1.0);
+			this.graphics.beginFill(0xDDDDDD, 0.5);
+			this.graphics.drawEllipse(-this.width*0.5, 0, this.width*2, this.height*3);
+			this.graphics.endFill();
+
+			this.scrollRect = new Rectangle(0,0, this.width, this.height);
+
+			this.graphics.lineStyle(0, 0xffffff);
+			this.graphics.beginFill(0xcccccc, 0.5);
+			this.graphics.drawRect(0, this.height*0.5, this.width-2, this.height*2);
+			this.graphics.endFill();
+*/
+		}
+
+
+
+
+		private function onRollOver():void
+		{
+/*
+			if(this.currentState == "collapsed")
+			{
+				bounce.play(); // bounce bounce bounce gangsta!
+			}
+*/		
+		}
+
+	]]>
+	</mx:Script>
+
+
+	<!-- EFFECTS Cloud Tool Transitions -->
+	<mx:Fade id="cloudPanelShow" alphaFrom="0.0" alphaTo="1.0" duration="500" />
+	<mx:Fade id="cloudPanelHide" alphaFrom="1.0" alphaTo="0.0" duration="500" />
+
+
+
+	<mx:ViewStack id="cloudTypePanel" width="100%" height="100%"
+		creationPolicy="all"
+
+		backgroundColor="0xDDDDDD" backgroundAlpha="0.5"
+		verticalGap="0"
+		borderStyle="solid" borderColor="0xAAAAAA" borderSides="top, left, right" cornerRadius="30"
+		paddingTop="0" paddingLeft="0" paddingRight="0"
+		dropShadowEnabled="false">
+
+		<cloudType:ImageCloudPanel id="imageCloudPanel" width="100%" height="100%"
+			showEffect="cloudPanelShow"
+			 />
+
+		<cloudType:TextCloudPanel id="textCloudPanel" width="100%" height="100%"
+			showEffect="cloudPanelShow"
+			/>
+
+		<cloudType:DrawCloudPanel id="drawCloudPanel" width="100%" height="100%"
+			showEffect="cloudPanelShow"
+			/>
+
+	</mx:ViewStack>	
+
+
+	<mx:states>
+		<mx:State name="collapsed">
+			<mx:SetProperty target="{this}" name="y" value="{centerPanelBottom}" />
+		</mx:State>
+
+		<mx:State name="normal">
+			<mx:SetProperty target="{this}" name="y" value="{centerPanelBottom-this.height-5}" />
+		</mx:State>
+	</mx:states>
+
+
+	<mx:transitions>
+		<mx:Transition fromState="normal" toState="collapsed">
+			<mx:Move target="{this}" yFrom="{this.y}" yTo="{centerPanelBottom}" duration="250"
+				suspendBackgroundProcessing="true" />
+		</mx:Transition>
+
+		<mx:Transition fromState="collapsed" toState="normal">
+			<mx:Move target="{this}" yFrom="{this.y}" yTo="{centerPanelBottom-this.height-5}" duration="250" 
+				suspendBackgroundProcessing="true"/>
+		</mx:Transition>
+	</mx:transitions>
+
+
+</mx:Box>

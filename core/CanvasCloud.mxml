@@ -1,0 +1,575 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:cloudAction="cloud.action.*" xmlns:cloudEditor="cloud.editor.*" 
+	xmlns:core="cloud.core.*"
+	implements="ICloudHistoryClient"
+	minWidth="100" maxWidth="1600" 
+	minHeight="100" maxHeight="1600"
+	clipContent="true"
+	autoLayout="false"
+	doubleClickEnabled="true"
+	horizontalScrollPolicy="off" verticalScrollPolicy="off" 
+
+    backgroundColor="0xFFFFFF" backgroundAlpha="1.0" 
+    borderStyle="solid" borderColor="0xFF4F4F" borderThickness="-1"
+
+    creationComplete="onCreationComplete()"
+    rollOver="// SET TOOL CURSOR"
+    rollOut="CloudCursor.SetCursor(CloudCursor.NORMAL)">
+
+
+	<mx:Script>
+    <![CDATA[
+
+		import mx.managers.DragManager;
+		import mx.controls.Alert;
+		import mx.collections.XMLListCollection;
+		import mx.events.CloseEvent;
+
+		import type.ImageCloud;
+		import type.DrawCloud;
+		import events.CloudEvent;
+
+
+		private static var factoryIndex:uint = 0;
+
+
+		// Reference to the application's cloud Controller
+		public var cloudController:CloudController = null;
+
+
+		[Bindable]
+		public var cloudsXML:XMLListCollection = new XMLListCollection(); // Cloud XML list for CloudTree
+
+
+
+		public var localID:uint = 0; // Local canvas ID (Incremental Creation Index), dont clone as is
+
+		public var remoteID:String = "0"; // Remote canvas ID (ID from the library/DB)
+
+
+		[Bindable]
+		public var iconBitmap:Bitmap = new Bitmap(); // generated, no need to clone or save.
+
+
+
+		[Bindable]
+		public function get usWidth():Number
+		{
+			return this.unscaledWidth;
+		}
+		public function set usWidth(width:Number):void
+		{
+			this.width = width * this.scaleX;
+		}
+
+		[Bindable]
+		public function get usHeight():Number
+		{
+			return this.unscaledHeight;
+		}
+		public function set usHeight(height:Number):void
+		{
+			this.height = height * this.scaleY;
+		}
+
+
+	
+		private function onCreationComplete():void
+		{
+			//DragManager.acceptDragDrop(this); // accept drag and drop
+
+			this.localID = factoryIndex++;
+
+            //UpdateIconBitmap();
+		}
+
+
+		// clone Canvas
+		public virtual function clone():CanvasCloud
+		{
+			var canvas:CanvasCloud = new CanvasCloud();
+
+			canvas.remoteID = this.remoteID;
+			canvas.name = this.name; // TODO: bug
+			canvas.width = this.width;
+			canvas.height = this.height;
+
+			canvas.setStyle('backgroundColor', this.getStyle('backgroundColor'));
+			canvas.setStyle('backgroundAlpha', this.getStyle('backgroundAlpha'));
+
+			for each(var sCloud:Cloud in this.getChildren()) // for each Cloud on the canvas
+			{
+				if(!sCloud)
+					continue;
+
+				var cloudClone:Cloud = sCloud.clone();
+				canvas.addChild(cloudClone); // Add cloud clone to cloned canvas
+			}
+
+			return canvas;
+		}
+
+
+		// Save Canvas XML
+		public virtual function Save():XML
+		{
+			var canvasXML:XML = new XML("<canvas></canvas>");
+
+			canvasXML.@localID = this.localID;
+			canvasXML.@remoteID = this.remoteID;
+			canvasXML.@name = this.name;
+			canvasXML.@width = this.width.toFixed(1);
+			canvasXML.@height = this.height.toFixed(1);
+
+			canvasXML.@backgroundColor = this.getStyle('backgroundColor');
+			canvasXML.@backgroundAlpha = this.getStyle('backgroundAlpha');
+
+			var cloudsXML:XML = new XML("<clouds></clouds>");
+			for each(var sCloud:Cloud in this.getChildren()) // for each Cloud on the canvas
+			{
+				if(!sCloud)
+					continue;
+
+				var cloudXML:XML = sCloud.Save(); // Save Cloud as XML
+				cloudsXML.appendChild( cloudXML ); // Add Cloud XML to Canvas XML
+			}
+			canvasXML.appendChild( cloudsXML ); // Add Clouds XML to Canvas
+
+			return canvasXML;
+		}
+
+
+		// Load Canvas XML (The most complicated Method of the whole software)
+		public virtual function Load(canvasXML:XML):void
+		{
+			if(!canvasXML)
+				return;
+
+			//this.localID = canvasXML.@localID;
+			this.remoteID = canvasXML.@remoteID;
+			this.name = canvasXML.@name;
+			this.width = canvasXML.@width;
+			this.height = canvasXML.@height;
+
+			this.setStyle('backgroundColor', canvasXML.@backgroundColor);
+			this.setStyle('backgroundAlpha', canvasXML.@backgroundAlpha);
+
+			// Set Clouds XML right now..so the tree is updated
+			this.cloudsXML = new XMLListCollection(canvasXML.clouds..cloud); // Cloud list
+
+			// Find all the clouds in canvas
+			for each(var cloudXML:XML in cloudsXML) // for each Cloud XML in Clouds XMLList
+			{
+				if(!cloudXML)
+					continue;
+
+				var sCloud:Cloud = FindCloud(cloudXML.@localID); // Find the cloud on canvas
+				if(sCloud) // Cloud exists on canvas
+				{
+					sCloud.Load(cloudXML);
+					SelectCloud(sCloud);
+				}
+				else // Cloud doesnt exists on canvas, create it
+				{
+					// Create the Cloud
+					var newCloud:Cloud = Cloud.CloudFactory(cloudXML.@type);
+					if(newCloud)
+					{
+						newCloud.Load(cloudXML); // Load cloud XML
+
+						this.addChild(newCloud); // Add cloud to canvas
+						SelectCloud(newCloud); // Select this cloud?
+					}
+				}
+			}
+
+
+			// Remove Zombie Clouds
+			// Loop through Clouds on Canvas, if it doesnt exist in the XML, delete it
+			for each(var curCloud:Cloud in this.getChildren())
+			{
+				if(!curCloud)
+					continue;
+
+				// Find if this cloud name is in the XML
+				var aliveClouds:XMLList = canvasXML.clouds.cloud.(@name == curCloud.name);
+				if(aliveClouds.length() == 0) // this cloud is dead
+				{
+					if(this.contains(curCloud)) // make sure the cloud is contained in canvsa
+            		{
+						this.removeChild(curCloud); // remove child
+						UnSelectCloud(); // UnSelect current Cloud
+            		}
+				}
+			}
+
+		}
+
+
+		// BUG if undoing creation??
+		//var cloudsXML:XMLList = canvasXML.clouds..cloud as XMLList;
+		//delete (canvasXML..cloud.(@name == cloudXML.@name))[0]; // ouch
+					
+
+
+		// NEW CLOUD
+		public function AddNewCloud(cloudName:String, cloudType:String, bitmapData:BitmapData=null, 
+			resizeCanvas:Boolean = false):Cloud
+		{
+			var newCloud:Cloud = this.cloudController.NewCloud(cloudName, cloudType, bitmapData);
+			AddCloud(newCloud);
+
+
+			if(resizeCanvas) // Resize Canvas
+			{
+				newCloud.x = 0;
+				newCloud.y = 0;
+				ResizeCanvasToCloudBound();
+			}
+			else
+			{
+				newCloud.x = 40; //(400*0.5 - newCloud.width*0.5);
+				newCloud.y = 40; //(400*0.5 - newCloud.height*0.5);
+			}
+
+
+			// New CloudXML
+			var newCloudXML:XML = new XML("<cloud></cloud>");
+
+			newCloudXML.@localID = newCloud.localID;
+			newCloudXML.@name = newCloud.name;
+			newCloudXML.@type = newCloud.type;
+
+			cloudsXML.addItemAt(newCloudXML, 0); // Add new cloud at index 0
+
+			// Dispatch the event that the selected cloud has changed
+			cloudController.dispatchEvent(new CloudEvent("selectCloud", newCloud));
+
+			return newCloud;
+		}
+
+
+		// DUPLICATE existing cloud
+		public function DuplicateCloud(cloudXML:XML):XML
+		{
+			var newCloudXML:XML = new XML(cloudXML); // Create Duplicated XML Cloud
+
+			var srcCloud:Cloud = FindCloud(cloudXML.@localID);
+			if(srcCloud)
+			{
+				var newCloud:Cloud = this.cloudController.DuplicateCloud(srcCloud); // Duplicate
+
+				newCloudXML.@localID = newCloud.localID;
+				newCloudXML.@name = newCloud.name;
+
+				var index:uint = cloudsXML.getItemIndex(cloudXML);
+				cloudsXML.addItemAt(newCloudXML, index++); // Add the duplicated XML Cloud above the source Cloud
+
+				this.addChildAt(newCloud, index); // Add cloud on canvas at index above the source Cloud
+				CloudHistory.action("Duplicate Cloud", this, true);
+
+				// Dispatch the event that the selected cloud has changed
+				cloudController.dispatchEvent(new CloudEvent("selectCloud", newCloud));
+			}
+			else
+			{
+				trace('cannot find source cloud to duplicate');
+			}
+
+			return newCloudXML;
+		}
+
+
+		// ADD Cloud
+        public function AddCloud(sCloud:Cloud):void
+        {
+			this.addChild(sCloud);
+			CloudHistory.action("New " + sCloud.type + " Cloud", this, false);
+        }
+
+
+
+
+		// Find Cloud by ID
+		public function FindCloud(localID:uint):Cloud
+		{
+			for each(var sCloud:Cloud in this.getChildren()) // For each cloud
+			{
+				if(!sCloud)
+					continue;
+
+				if(sCloud.localID == localID)
+				{
+					return sCloud;	
+				}
+			}
+			return null;
+		}
+
+
+		// FIND Cloud : Find a cloud based on cloud name
+		// WARNING, There may be more than one Cloud with the same name
+		// returns the first one found
+        public function FindCloudByName(cloudName:String):Cloud
+        {
+			var sCloud:Cloud = this.getChildByName(cloudName) as Cloud; // Return the first one
+   			if(!sCloud)
+   			{
+   				//CloudAlert.show("FindCloud : Cloud '" + cloudName + "' not found in canvas");
+   				trace("FindCloud : Cloud '" + cloudName + "' not found in canvas");
+   			}
+   			return sCloud;
+        }
+
+
+
+
+		// SELECT CLOUD
+		public function SelectCloud(sCloud:Cloud):void
+		{
+			cloudController.SetCloud(sCloud);
+		}
+
+
+		// SELECT Cloud by ID
+		public function SelectCloudByID(cloudID:uint):void
+		{
+			var sCloud:Cloud = FindCloud(cloudID);
+			if(sCloud)
+			{
+				SelectCloud(sCloud);
+			}
+		}
+
+		// SELECT Cloud: Highlight Cloud in the Canvas
+		// Warning: maybe more than one
+		public function SelectCloudByName(cloudName:String):void
+		{
+			var sCloud:Cloud = FindCloudByName(cloudName);
+			if(sCloud)
+			{
+				SelectCloud(sCloud);
+			}
+		}
+
+
+		// UNSELECT Cloud
+		public function UnSelectCloud():void
+		{
+			if(cloudController)
+			{
+				cloudController.UnSelectCloud(false);
+			}
+		}
+
+
+		// RENAME Cloud
+		public function RenameCloud(cloudID:uint, oldCloudName:String, newCloudName:String):void
+		{
+			var sCloud:Cloud = FindCloud(cloudID);
+			if(sCloud)
+			{
+				if(sCloud.name != oldCloudName)
+				{
+					Alert.show('Name incompatibility');
+					return;
+				}
+				
+				sCloud.name = newCloudName;
+				CloudHistory.action("Rename Cloud", this, false);
+			}
+		}
+
+
+
+		//MOVE Cloud
+		public function MoveCloud(cloudID:uint, newIndex:int):void
+		{
+			var sCloud:Cloud = FindCloud(cloudID);
+			if(sCloud && newIndex >= 0 && newIndex < this.numChildren)
+			{
+				this.setChildIndex(sCloud, newIndex);
+				CloudHistory.action("Move Cloud", this, false);
+			}
+
+			this.invalidateDisplayList();
+		}
+
+
+		// REMOVE Cloud by object
+        public function RemoveCloud(sCloud:Cloud):void
+        {
+            if(this.contains(sCloud)) // cloud contained in canvsa
+            {
+            	// Remove Cloud from canvas
+            	this.removeChild(sCloud);
+
+            	CloudHistory.action("Delete Cloud", this, true);
+
+				// UnSelect All Clouds
+				UnSelectCloud();
+            }
+            else
+            {
+            	trace('error: canvas remove non-children cloud');
+            }
+        }
+
+
+		// REMOVE Cloud by ID
+        public function RemoveCloudByID(cloudID:uint):void
+        {
+        	var sCloud:Cloud = FindCloud(cloudID);
+        	if(sCloud)
+        	{
+        		RemoveCloud(sCloud);
+        	}
+        	else
+        	{
+        		Alert.show("RemoveCloudByName : Cloud not found in canvas: '" + cloudID + "'");
+        	}
+        }
+
+
+		// REMOVE All Cloud
+		public function RemoveAllClouds():void
+		{
+			this.removeAllChildren();
+			CloudHistory.action("Delete all Cloud", this, true);
+		}
+
+
+
+		// MERGE 2 Clouds
+		public function MergeClouds(cloud1ID:uint, cloud2ID:uint):Boolean
+		{
+			var cloud1:Cloud = FindCloud(cloud1ID); // Find Cloud 1 (top)
+			if(!cloud1)
+			{
+				Alert.show("MergeClouds : Cloud not found in canvas: '" + cloud1ID + "'", "Merge Clouds");
+				return false;
+			}
+			var cloud2:Cloud = FindCloud(cloud2ID); // Find Cloud 2 (target)
+			if(!cloud2)
+			{
+				Alert.show("MergeClouds : Cloud not found in canvas: '" + cloud2ID + "'", "Merge Clouds");
+				return false;
+			}
+
+			if(cloud2.type == CloudType.TEXT)
+			{
+				Alert.show("Cannot merge Cloud on Text Cloud", "Merge Clouds");
+				return false;
+			}
+
+			// Compute that they at least overlap
+			if(!cloud1.hitTestObject(cloud2))
+			{
+				Alert.show("The Clouds do not overlap, No merging will occur", "Merge Clouds");
+				return false;
+			}
+
+
+			// TODO: warn that the text cloud will not be editable anymore
+			if(cloud1.type == CloudType.TEXT)
+			{
+				// Do you really want to merge text?
+	        	var alert:Alert = Alert.show("The Text Cloud \'" + cloud1.name + "\' will not be editable anymore after the Merge", "Merge Text Cloud");
+				alert.titleIcon = Globals.g_assets.TriCloudIcon16;
+			}
+
+
+			var bmpData:BitmapData = cloud1.GetBitmapData();
+
+			// dest Matrix
+			var destMat:Matrix = new Matrix();
+			destMat.translate(cloud1.x - cloud2.x, cloud1.y - cloud2.y); // Translate Matrix Cloud
+
+			var destBmpData:BitmapData = cloud2.GetBitmapData(); // Retreive Cloud's Bitmap
+			if(destBmpData)
+			{
+				// Draw Text BmpData on Cloud BmpData
+				destBmpData.draw(bmpData, destMat, null,null,null, true);
+			}
+
+			CloudHistory.action("Merge Clouds", this, true);
+
+			return true;
+		}
+
+
+
+		// Re-ordered the clouds on the tree. so we have to do the same for the canvas.
+		// TODO: change that to be part of an update loop?
+		public function ReOrderClouds():void
+		{
+			var cloudIndex:int=0;
+			var numCloudXML:int = cloudsXML.length;
+
+			for(cloudIndex = 0; cloudIndex < numCloudXML; cloudIndex++) // For each Cloud in the tree
+			{
+				var newCloudIndexInCanvas:int = numCloudXML - cloudIndex - 1; // new cloud Position on canvas
+
+				// Change the cloud index in canvas
+				MoveCloud(cloudsXML[cloudIndex].@localID, newCloudIndexInCanvas);
+            }
+		}
+
+
+		// Resize Canvas to its children bounding box
+		public function ResizeCanvasToCloudBound():void
+		{
+			this.validateNow();
+
+			var tag:DisplayObject;
+			var cloudBound:Rectangle = null; // tag bounding rectangle relative to the cloud
+			var rec:Rectangle = new Rectangle(0,0,0,0); // cloud's tag bouding rectangle
+			rec.left = int.MAX_VALUE;
+			rec.top = int.MAX_VALUE;
+			rec.right = 0;
+			rec.bottom = 0;
+
+			for each(tag in this.getChildren()) // For each child of this cloud
+			{
+			    cloudBound = tag.getRect(this); // cloud bounding rectangle within cloud
+			    // getRect() ignores the strokes and shapes
+
+				if(cloudBound.left < rec.left)
+					rec.left = (isNaN(cloudBound.left)? rec.left : cloudBound.left);
+
+				if(cloudBound.top < rec.top)
+					rec.top = (isNaN(cloudBound.top)? rec.top : cloudBound.top);
+
+				if(cloudBound.right > rec.right)
+					rec.right = (isNaN(cloudBound.right)? rec.right : cloudBound.right);
+
+				if(cloudBound.bottom > rec.bottom)
+					rec.bottom = (isNaN(cloudBound.bottom)? rec.bottom : cloudBound.bottom);
+			}
+
+			// Resize Canvas
+			this.width = rec.width * this.scaleX;
+			this.height = rec.height * this.scaleY;
+		}
+
+
+		// UPDATE ICON
+		public function UpdateIconBitmap():void
+		{
+			const iconSize:int = 100;
+
+			var bmpData:BitmapData = new BitmapData(iconSize, iconSize, true, 0); // slower with alpha..
+			var mat:Matrix = Globals.GetIconMatrix(this, iconSize, iconSize);
+
+			bmpData.draw(this, mat, null, null, null, true);
+
+	    	iconBitmap.bitmapData = bmpData;
+	    	iconBitmap.smoothing = true; // slower....
+		}
+
+
+	]]>
+    </mx:Script>
+
+
+</mx:Canvas>

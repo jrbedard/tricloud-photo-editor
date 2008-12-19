@@ -1,0 +1,279 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:cloudControls="controls.*" 
+	xmlns:colorClasses="controls.colorClasses.*"
+	width="350" height="400"
+	layout="vertical"
+	currentState="solid"
+	title="Color"
+	horizontalScrollPolicy="off" verticalScrollPolicy="off"
+	showCloseButton="true"
+
+	styleName="CloudDialog"
+	titleStyleName="CloudDialogTitle"
+
+	creationComplete="onCreationComplete()">
+
+
+	<mx:Script>
+    <![CDATA[
+    	import mx.graphics.GradientEntry;
+    	import mx.collections.ArrayCollection;
+    	import mx.controls.List;
+		import mx.events.IndexChangedEvent;
+		import mx.events.ListEvent;
+		import mx.events.CloseEvent;
+
+
+		[Bindable]
+		public var gradientList:ArrayCollection = new ArrayCollection(); // List of Gradient
+
+
+		[Bindable]
+		public var _dialogTitle:String = "";
+
+
+
+		// Color
+		public function set selectedColor(value:uint):void
+		{
+			if(solidControl)
+			{
+				solidControl.color = value;
+			}
+		}
+
+		// Alpha
+		public function set selectedAlpha(value:Number):void
+		{
+			if(solidControl)
+			{
+				solidControl.selectedAlpha = value;
+			}
+		}
+
+		// TODO: gradient access
+
+
+
+
+		// OLD COLOR & ALPHA
+
+		[Bindable]
+		private var _oldColor:uint = 0x000000;
+
+		[Bindable]
+		private var _oldAlpha:Number = 1.0;
+
+
+		// old Color
+		public function set oldColor(c:uint):void
+		{
+		   _oldColor = c;
+		   solidControl.DrawOldColorSwatch(_oldColor, _oldAlpha);
+		}
+		[Bindable]
+		public function get oldColor():uint
+		{
+		    return _oldColor;
+		}
+
+
+		// old Alpha
+		public function set oldAlpha(a:Number):void
+		{
+			_oldAlpha = a;
+			solidControl.DrawOldColorSwatch(_oldColor, _oldAlpha);
+		}
+		[Bindable]
+		public function get oldAlpha():Number
+		{
+		    return _oldAlpha;
+		}
+
+
+		// old Gradient
+		[Bindable]
+		public var _oldGradientSelected:Boolean = false;
+
+		[Bindable]
+		public var _oldGradient:CloudGradient = null;
+
+
+
+
+		public function set dialogTitle(value:String):void
+		{
+			_dialogTitle = value;
+			if(panelViewStack)
+			{
+				this.title = _dialogTitle + ((panelViewStack.selectedIndex == 0) ? ' Color' : ' Gradient');
+			}
+		}
+
+
+
+		private function onCreationComplete():void
+		{
+			this.addEventListener("colorChange", onChangeColor);
+			this.addEventListener("gradientParamChange", onGradientParamChange);
+
+			PopulateGradientList();
+
+			// Set the Right Click menu for this Dialog
+   			var rightClickMenu:RightClickMenu = new RightClickMenu(this.title);
+   			this.contextMenu = rightClickMenu.triCloudContextMenu;
+		}
+
+		// Gradient Presets
+		private function PopulateGradientList():void
+		{
+			var gradientFactory:GradientFactory = new GradientFactory();
+			gradientFactory.Populate(gradientList);
+		}
+
+
+
+
+		private function onClickGradientBtn():void
+		{
+			if(panelViewStack.selectedIndex == 0) // Color Panel
+			{
+				panelViewStack.selectedIndex = 1;
+			}
+			else if(panelViewStack.selectedIndex == 1) // Gradient Panel
+			{
+				panelViewStack.selectedIndex = 0;
+			}
+		}
+
+
+		private function onChangeViewStack(event:IndexChangedEvent):void
+		{
+			if(event.newIndex == 0) // Color Panel
+			{
+				this.title = _dialogTitle + ' Color';
+				gradientBtn.label = "Grad";
+			}
+			else // Gradient Panel
+			{
+				this.title = _dialogTitle + ' Gradient';
+				gradientBtn.label = "Ok";
+			}
+		}
+
+
+		// On solid Color Changed
+		private function onChangeColor(event:ColorEvent):void
+		{
+			// Unselect item in gradientGrid
+			gradientGrid.selectedIndex = -1;
+		}
+
+		// Click Gradient Item
+		private function onItemClickGradientList(event:ListEvent):void
+		{
+			// Dispatch the event that the selected gradient changed
+			this.dispatchEvent(new GradientEvent("gradientChange", event.target.selectedItem as CloudGradient));
+		}
+
+		// DoubleClick Gradient List
+		private function onDoubleClickGradientItem(event:MouseEvent):void
+		{
+			if(event.target.className == "GradientItem") // if its a Gradient Item
+			{
+				panelViewStack.selectedIndex = 1; // Switch to Gradient Control (Edit)
+			}
+		}
+
+		
+
+		private function onGradientParamChange(event:GradientEvent):void
+		{
+			// ...
+		}
+
+
+		private function onClickOk():void
+		{
+			this.dispatchEvent(new Event("close"));
+		}
+
+		private function onClickCancel():void
+		{
+			selectedColor = oldColor;
+			selectedAlpha = oldAlpha;
+			this.dispatchEvent(new Event("close"));
+		}
+
+     ]]>
+    </mx:Script>
+
+
+
+	<!-- SOLID & GRADIENT VIEW STACK -->
+	<mx:ViewStack id="panelViewStack" width="100%" height="100%"
+		backgroundAlpha="0"
+		borderStyle="none"
+		paddingTop="0" paddingLeft="0" paddingRight="0"
+		dropShadowEnabled="false"
+		creationPolicy="all"
+		change="onChangeViewStack(event)">
+
+		<!-- SOLID COLOR PANEL -->
+		<colorClasses:SolidControl id="solidControl" width="100%" height="100%" />
+
+		<!-- GRADIENT COLOR PANEL -->
+		<colorClasses:GradientControl id="gradientControl" width="100%" height="100%" />
+
+	</mx:ViewStack>
+
+
+	<!-- GRADIENT (COMMON to Color and Gradient panels)-->
+	<mx:HBox id="gradientBox" width="100%"
+		verticalAlign="middle">
+
+		<mx:Button id="gradientBtn" label="Grad" click="onClickGradientBtn()"/>	
+
+		<mx:TileList id="gradientGrid" width="100%"
+			columnCount="1" columnWidth="30"
+			rowCount="1" rowHeight="26"
+			doubleClickEnabled="true"
+			allowDragSelection="false"
+			useRollOver="false"
+
+			dataProvider="{gradientList}"
+			itemRenderer="controls.colorClasses.GradientItem"
+
+			itemClick="onItemClickGradientList(event);"
+			doubleClick="onDoubleClickGradientItem(event);"/>
+
+	</mx:HBox>
+
+
+	<!-- CONTROL BAR -->
+	<mx:ControlBar width="100%" horizontalAlign="right"
+		paddingBottom="3" paddingLeft="0" paddingRight="30" paddingTop="3">
+		<mx:Button id="okButton" label="Ok" click="onClickOk()" styleName="OkButton" />
+		<mx:Button id="cancelButton" label="Cancel" click="onClickCancel()" styleName="CancelButton" />
+	</mx:ControlBar>
+
+
+
+	<mx:states>
+		<mx:State name="solid">
+			<mx:SetProperty target="{gradientBox}" name="includeInLayout" value="false" />
+			<mx:SetProperty target="{gradientBox}" name="visible" value="false" />
+		</mx:State>
+
+		<mx:State name="solidGradient">
+			<mx:SetProperty target="{this}" name="height" value="{this.height + 25}" />
+			<mx:SetProperty target="{gradientBox}" name="includeInLayout" value="true" />
+			<mx:SetProperty target="{gradientBox}" name="visible" value="true" />
+		</mx:State>
+	</mx:states>
+
+
+
+
+
+</mx:TitleWindow>

@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:rightPanels="panels.right.*"
+	width="100%" height="100%"
+    backgroundColor="0xf5f5f5" backgroundAlpha="0"
+    verticalGap="10">
+
+
+  	<mx:Script>
+	<![CDATA[
+
+		import mx.core.UIComponent;
+		import mx.controls.Button;
+		import mx.controls.Text;
+ 		import mx.controls.List;
+ 		import mx.controls.Alert;
+ 		import mx.containers.Accordion;
+		import mx.events.ListEvent;
+        import mx.managers.PopUpManager;
+        import mx.binding.utils.BindingUtils;
+
+		import core.Cloud;
+		import core.CloudController;
+		import events.*;
+		import CloudEngine;
+
+
+
+		private var cloudController:CloudController = null;
+
+		private var cloudPanelHeader:CloudPanelHeader = null;
+
+
+		[Bindable]
+		private var m_cloud:Cloud = null;
+
+
+
+		public function init(cloudPanelHeader:CloudPanelHeader):void
+		{
+			this.cloudPanelHeader = cloudPanelHeader;
+			cloudController = CloudEngine.GetInstance().GetCloudController();
+
+			this.enabled = false;
+			cloudPanelHeader.enabled = false;
+
+			// Like BottomPanel:
+
+			// Listen for selected cloud in the cloud tree or canvas
+			cloudController.addEventListener("selectCloud", onChangeSelectedCloud);
+		
+			// Listen on the cloudController that no cloud is selected
+			cloudController.addEventListener("unSelectClouds", onUnSelectClouds);
+		}
+
+
+
+		// Changed the selected cloud in the cloud tree or canvas
+		private function onChangeSelectedCloud(cloudEvent:CloudEvent):void
+		{
+			if(cloudEvent.m_cloud)
+			{
+				m_cloud = cloudEvent.m_cloud;
+
+				cloudPanelHeader.SetCloud(m_cloud); // Bind cloud for this panel header
+				cloudPropertyPanel.SetCloud(m_cloud); // Bind cloud for Property Accordion
+				cloudFiltersPanel.SetCloud(m_cloud); // Bind cloud for Filter Accordion
+
+
+				// Enable only when a cloud is selected...
+				this.enabled = true;
+				cloudPanelHeader.enabled = true;
+
+				this.label = m_cloud.name;
+
+				// Here lies the attempt to have a dynamic image in the accordion header...
+				// I use the canvas hack now, RIP.
+				//this.icon
+			}
+			else
+			{
+				this.enabled = false;
+			}
+		}
+
+
+		// No cloud is selected on the canvas
+		private function onUnSelectClouds(cloudEvent:CloudEvent):void
+		{
+			this.enabled = false;
+			cloudPanelHeader.enabled = false;
+		}
+
+
+	]]>
+	</mx:Script>
+
+
+	<rightPanels:CloudPropertyPanel id="cloudPropertyPanel" width="100%" height="115"/>
+
+	
+	<mx:HBox width="100%" horizontalGap="5" 
+		horizontalAlign="center" verticalAlign="middle">
+
+		<mx:ToggleButtonBar id="cloudAdvancedBar" dataProvider="{cloudAdvancedProperties}" />
+
+	</mx:HBox>
+
+
+	<mx:ViewStack id="cloudAdvancedProperties" width="100%" height="100%"
+		borderStyle="none"
+		paddingTop="0"
+		creationPolicy="all">
+
+		<rightPanels:CloudFiltersPanel id="cloudFiltersPanel" label="Filters"
+			width="100%" height="100%" />	
+
+		<rightPanels:CloudModifiersPanel id="cloudModifiersPanel" label="Modifiers"
+			width="100%" height="100%"/>
+
+	</mx:ViewStack>
+	
+
+	
+</mx:VBox>
+

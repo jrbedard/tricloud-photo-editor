@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:cloudPanels="panels.*"
+	width="500"
+	titleIcon="{Globals.g_assets.ImageImporter}"
+	title="Contact TriCloud"
+	layout="vertical"
+	horizontalScrollPolicy="off" verticalScrollPolicy="auto"
+	showCloseButton="true"
+
+	styleName="CloudDialog"
+	titleStyleName="CloudDialogTitle"
+	horizontalAlign="center"
+
+	creationComplete="onCreationComplete()"
+	close="onClickCancel()">
+
+
+	<mx:Script>
+    <![CDATA[
+
+		import mx.rpc.remoting.RemoteObject;
+        import mx.rpc.events.*;
+        import mx.controls.Alert;
+        import mx.managers.CursorManager;
+        import mx.managers.PopUpManager;
+        import mx.events.ValidationResultEvent;
+
+
+		// Static instance, singleton
+		public static const contactDialog:ContactDialog = new ContactDialog();
+
+		// RoR RO
+        private var contactRemObj:RemoteObject = new RemoteObject();
+
+
+
+		private function onCreationComplete():void
+    	{
+    		// Set the Right Click menu for this Dialog
+   			var rightClickMenu:RightClickMenu = new RightClickMenu(this.title);
+   			this.contextMenu = rightClickMenu.triCloudContextMenu;
+
+			// Remote object events
+    		contactRemObj.destination = "ContactService";
+    		contactRemObj.submit.addEventListener("result", onResultSubmitContact);
+        	contactRemObj.addEventListener("fault", onFault);
+    	}
+
+
+		// Event listener for the valid and invalid events.
+		private function handleTitleValid(eventObj:ValidationResultEvent):void
+		{
+			if(eventObj.type==ValidationResultEvent.VALID)    
+				submitButton.enabled = true;
+			else
+				submitButton.enabled = false;
+		}
+
+		// Event listener for the valid and invalid events.
+		private function handleBodyValid(eventObj:ValidationResultEvent):void
+		{
+			if(eventObj.type==ValidationResultEvent.VALID)    
+				submitButton.enabled = true;
+			else
+				submitButton.enabled = false;
+		}
+
+		
+		private function onClickSubmit():void
+		{
+			// Create new XML Contact
+			var contactXML:XML = new XML("<contact></contact>"); 
+
+			var userXML:XML = CloudEngine.GetInstance().GetSessionController().GetUser();
+			if(userXML)
+			{
+				contactXML.@userID =  userXML.@id; // TODO
+			}
+			else
+			{
+				contactXML.@userID = '';
+			}
+
+			contactXML.@category = contactCategory.selectedItem.name;
+			contactXML.@title = contactTitle.text;
+			contactXML.@body = contactBody.text;
+			contactXML.@email = contactEmail.text;
+			contactXML.@version = Globals.g_version;
+
+			// Submit Contact XML to backEnd
+			contactRemObj.submit(contactXML.toXMLString());
+
+			CursorManager.setBusyCursor();
+			this.enabled = false;
+		}
+
+
+		// Result on submit Bug or Suggestion
+		private function onResultSubmitContact(event:ResultEvent):void 
+    	{
+    		this.enabled = true;
+    		CursorManager.removeBusyCursor();
+
+			onClickCancel(); // Close Dialog
+
+			CloudAlert.show('Thank you for your submission!', 'Contact TriCloud');	
+    	}
+
+
+		// FAULT
+		private function onFault(event:FaultEvent):void 
+        {
+        	this.enabled = true;
+        	CursorManager.removeBusyCursor(); // Hide the busy cursor
+
+            CloudAlert.show(event.fault.faultString, 'Contact TriCloud Error');
+        }
+
+
+		private function onClickContactUsOnline():void
+		{
+			var request:URLRequest = new URLRequest("/contact");
+			navigateToURL(request, "TriCloud"); 
+		}
+
+		private function onClickCancel():void
+		{
+			CleanUp();
+			PopUpManager.removePopUp(contactDialog);
+		}
+
+		private function CleanUp():void
+		{
+			contactTitle.text = '';
+			contactBody.text = '';
+			contactEmail.text = '';
+		}
+
+ 	]]>
+    </mx:Script>
+
+
+	<mx:VBox verticalGap="0">
+		<mx:Label text="Your feedback is very valuable to us!" />
+
+		<mx:HBox horizontalGap="0" verticalAlign="middle">
+			<mx:Label text="We also have an" />
+			<mx:LinkButton id="onlineContact" label="Online Contact Form" click="onClickContactUsOnline()" />
+		</mx:HBox>
+	</mx:VBox>
+
+
+	<!-- SUBMIT FEEDBACK -->
+	<mx:Form id="submitBug"
+		width="100%"
+		horizontalScrollPolicy="off" verticalScrollPolicy="off"
+		verticalGap="5"
+		paddingLeft="5" paddingTop="10" paddingBottom="5" paddingRight="5">
+
+		<mx:FormItem label="Category:">
+			<mx:ComboBox id="contactCategory">
+				<mx:Array id="contactCategories">
+					<mx:Object name="Bug" label="Bug" />
+					<mx:Object name="Comment" label="Comment / Suggestion" />
+				</mx:Array>
+			</mx:ComboBox>
+		</mx:FormItem>
+
+		<mx:FormItem label="Title:" width="100%">
+			<mx:TextInput id="contactTitle" width="75%" />
+		</mx:FormItem>
+
+		<mx:FormItem label="Body:" width="100%">
+			<mx:TextArea id="contactBody" width="90%" height="170" />
+		</mx:FormItem>
+
+		<mx:FormItem label="Email:" width="100%">
+			<mx:TextInput id="contactEmail" width="75%" />
+		</mx:FormItem>
+	</mx:Form>
+
+
+	<mx:Validator id="titleValid" required="true"
+        source="{contactTitle}" property="text" 
+        valid="handleTitleValid(event)" invalid="handleTitleValid(event)"/>
+
+	<mx:Validator id="bodyValid" required="true"
+        source="{contactBody}" property="text"
+        valid="handleBodyValid(event)" invalid="handleBodyValid(event)"/>
+
+	<mx:EmailValidator id="emailValidator"
+		source="{contactEmail}" property="text"/>
+
+
+
+    <mx:ControlBar>
+		<mx:Button id="submitButton" label="Submit" click="onClickSubmit()" styleName="OkButton" enabled="false"/>
+		<mx:Button id="cancelButton" label="Cancel" click="onClickCancel()" styleName="CancelButton" />
+	</mx:ControlBar>
+    
+</mx:TitleWindow>

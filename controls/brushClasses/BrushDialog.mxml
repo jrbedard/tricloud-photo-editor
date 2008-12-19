@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:cloudControls="cloud.controls.*" 
+	width="220" height="210"
+	layout="vertical"
+	titleIcon="{Globals.g_assets.DrawBrushIcon}"
+	title="Brushes"
+	horizontalScrollPolicy="off" verticalScrollPolicy="off"
+	showCloseButton="true"
+
+	styleName="CloudDialog"
+	titleStyleName="CloudDialogTitle"
+	paddingTop="0" paddingBottom="0"
+
+	creationComplete="onCreationComplete()">
+
+	
+	<mx:Script>
+    <![CDATA[
+
+    	import mx.events.ListEvent;
+		import mx.collections.ArrayCollection;
+		import mx.managers.PopUpManager;
+
+		import library.CloudLibraryBrowseEvent;
+		import share.ShareController;
+
+
+		// Static instance, singleton
+		public static var brushDialog:BrushDialog = new BrushDialog();
+
+		private var brushCreation:BrushCreation = BrushCreation.brushCreation;
+
+
+ 		[Bindable]
+		public var brushList:ArrayCollection = new ArrayCollection(); // Array of Brushes
+
+
+
+ 		private function onCreationComplete():void
+		{
+			PopulateBrushList();
+
+			brushGrid.selectedIndex = 0;
+
+			// Set the Right Click menu for this Dialog
+   			var rightClickMenu:RightClickMenu = new RightClickMenu(this.title);
+   			this.contextMenu = rightClickMenu.triCloudContextMenu;
+
+			brushCreation.addEventListener('newBrush', onNewBrushCreated);
+		}
+
+
+		private function PopulateBrushList():void
+		{
+			var brushFactory:BrushFactory = new BrushFactory();
+			brushFactory.Populate(brushList);
+		}
+
+		public function AddCloudBrush(cloudBrushXML:XML):void
+		{
+			// todo: bitmaps
+
+			var newBrush:CloudBrush = new CloudBrush();
+			newBrush.Load(cloudBrushXML);
+
+			brushList.addItem(newBrush);
+		}
+
+
+ 		private function onItemClickBrushList(event:ListEvent):void
+ 		{
+ 			this.dispatchEvent(new BrushEvent("brushChanged", event.target.selectedItem as CloudBrush));
+ 		}
+
+		private function onItemDoubleClickBrushList(event:ListEvent):void
+		{
+			onItemClickBrushList(event);
+			this.dispatchEvent(new Event('close'));
+		}
+
+
+
+		private function onClickBrowse():void
+		{
+			// Open the Cloud Library to browse/search for Brushes
+			TriCloud(this.parentApplication).dispatchEvent(
+				new CloudLibraryBrowseEvent("browseCloudLibrary", '', "useCount", CloudType.ST_BRUSH));
+		}
+
+		private function onClickCreateBrush():void
+		{
+			PopUpManager.addPopUp(brushCreation, this.parentApplication as DisplayObject, true);
+			brushCreation.init();
+			PopUpManager.centerPopUp(brushCreation); // Center Font Creation dialog
+		}
+
+		private function onNewBrushCreated(brushEvent:BrushEvent):void
+		{
+			// Add new font to list
+			brushList.addItemAt(brushEvent.brush, 0); // add on top
+
+
+		}
+
+
+		private function onClickShareBrush():void
+		{
+			var shareController:ShareController = CloudEngine.GetInstance().GetShareController();
+			shareController.ShareCloud(brushGrid.selectedItem as CloudBrush, CloudType.ST_BRUSH);
+
+			// Close Font Dialog
+			this.dispatchEvent(new Event("close"));
+		}
+		 
+
+		// KEYBOARD Handler
+		protected override function keyDownHandler(event:KeyboardEvent):void
+		{
+			//super.keyDownHandler(event);
+		}
+ 
+ 
+  	]]>
+    </mx:Script>
+
+
+	<!-- BRUSH LIST -->
+	<mx:List id="brushGrid" width="100%" height="100%"
+		wordWrap="true"
+		editable="false"
+		allowDragSelection="false" dragEnabled="false" dropEnabled="false"
+		rowCount="8" rowHeight="42" 
+		columnCount="1" columnWidth="150"
+		doubleClickEnabled="true"
+
+		verticalAlign="middle"
+		backgroundAlpha="0.5"
+		dropShadowEnabled="false"
+
+		dataProvider="{brushList}"
+		itemRenderer="controls.brushClasses.BrushItem"
+		itemClick="onItemClickBrushList(event)"
+		itemDoubleClick="onItemDoubleClickBrushList(event)"/>
+
+
+	<mx:ControlBar width="100%"
+		horizontalAlign="center"
+		paddingBottom="3" paddingLeft="0" paddingRight="0" paddingTop="3">
+
+		<mx:Button id="browseButton" icon="{Globals.g_assets.TriCloudIcon16}" 
+			toolTip="Browse/Search Brushes in the Cloud Library"
+			click="onClickBrowse()"/>
+
+		<mx:Button id="createBrushBtn" icon="{Globals.g_assets.AddTagIcon}" 
+			toolTip="Import/Create Brush"
+			click="onClickCreateBrush()" />
+
+		<mx:Button id="shareBrushBtn" icon="{Globals.g_assets.ShareIcon}"
+			toolTip="Share this Brush"
+			click="onClickShareBrush(); // Dislpay Button only if Brush's remoteID == '0'"/>
+
+	</mx:ControlBar>
+
+
+</mx:TitleWindow>

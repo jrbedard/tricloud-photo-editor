@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Panel xmlns:mx="http://www.adobe.com/2006/mxml"
+	width="125" height="125"
+	layout="absolute"
+	backgroundColor="0xCCCCCC" backgroundAlpha="0.5"
+	creationComplete="onCreationComplete()">
+
+
+	<mx:Script>
+    <![CDATA[
+
+		import mx.events.SliderEvent;
+
+
+		//  Horizontal Slider
+		[Bindable]
+		public var valueX:Number = 0.5;
+
+
+		// Vertical Slider
+		[Bindable]
+		public var valueY:Number = 0.5;
+
+
+
+		private function onCreationComplete():void
+		{
+			// Set the Right Click menu for this Dialog
+   			var rightClickMenu:RightClickMenu = new RightClickMenu(this.title);
+   			this.contextMenu = rightClickMenu.triCloudContextMenu;
+		}
+
+
+		
+
+		private function onChangeXSlider(event:SliderEvent):void
+		{
+			valueX = event.value;
+			this.dispatchEvent(new Event("change"));
+		}
+
+		private function onChangeYSlider(event:SliderEvent):void
+		{
+			valueY = event.value;
+			this.dispatchEvent(new Event("change"));
+		}
+
+
+		private function dataTipFuncX(val:Number):String
+		{
+			var str:String = (val * 100).toFixed(0) + '%';
+			return str;
+		}
+
+		private function dataTipFuncY(val:Number):String
+		{
+			var str:String = (val  * 100).toFixed(0) + '%';
+			return str;
+		}
+
+
+		private function onClickOkButton():void
+		{
+			this.dispatchEvent(new Event("close"));
+		}
+
+
+    ]]>
+    </mx:Script>
+
+
+	<!-- HORIZONTAL SLIDER -->
+	<mx:HSlider id="xSlider"
+		x="{ySlider.width}" y="{this.height - xSlider.height}"
+		width="{this.width - ySlider.width}" height="16"
+		minimum="0.0" maximum="1.0"
+		value="{valueX}"
+		snapInterval="{0.01}"
+
+		liveDragging="true" allowTrackClick="true"
+		tickInterval="0.1" tickColor="0x000000" tickThickness="1"
+		labels="['','50%','100%']"
+
+		toolTip="Select the horizontal roundness from 0 to 100%"
+		dataTipFormatFunction="dataTipFuncX"
+		dataTipOffset="-2"
+
+		thumbPress="CloudCursor.SetCursor(CloudCursor.TRANSLATE_HORI);"
+		thumbRelease="CloudCursor.SetCursor(CloudCursor.NORMAL);"
+		change="onChangeXSlider(event)"/>
+
+
+	<!-- VERTICAL SLIDER -->
+	<mx:VSlider id="ySlider"
+		x="0" y="0"
+		width="16" height="{this.height}"
+		minimum="0.0" maximum="1.0"
+		value="0.5"
+		snapInterval="0.01"
+
+		liveDragging="true" allowTrackClick="true"
+		tickInterval="0.1" tickColor="0x000000" tickThickness="1"
+		labels="['0','50%','100%']"
+
+		toolTip="Select the vertical roundness from 0 to 100%"
+		dataTipFormatFunction="dataTipFuncY"
+		dataTipOffset="-2"
+
+		thumbPress="CloudCursor.SetCursor(CloudCursor.TRANSLATE_VERT);"
+		thumbRelease="CloudCursor.SetCursor(CloudCursor.NORMAL);"
+		change="onChangeYSlider(event)"/>
+
+</mx:Panel>

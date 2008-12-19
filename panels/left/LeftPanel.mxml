@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Panel xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:cloud="cloud.*" xmlns:panels="panels.*" 
+	xmlns:cloudLibrary="library.*" xmlns:cloudTree="tree.*" xmlns:leftPanels="panels.left.*"
+	horizontalScrollPolicy="off" verticalScrollPolicy="off"
+	layout="vertical" verticalGap="0"
+	currentState="myClouds"
+
+	styleName="CloudPanel" 
+	>
+
+
+	<mx:Script>
+    <![CDATA[
+
+		import mx.core.Application;
+		import mx.containers.HDividedBox;
+		import mx.events.ItemClickEvent;
+        import mx.managers.PopUpManager;
+
+		import library.MetaCloudPanel;
+		import library.LibraryHistory;
+
+
+		[Bindable]
+		public var metaCloudPanel:MetaCloudPanel = null;
+
+
+
+		public function init():void
+       	{
+       		cloudTreePanel.init();
+        }
+
+
+		public function onChangeChildView(event:Event):void
+		{
+			// TODO: disable this while actually transitionning, if transitions works one day
+
+			if(leftViewStack.selectedIndex == 0) // My Clouds
+			{
+				this.setCurrentState("myClouds");
+				Application(this.parentApplication).setCurrentState("cloudDesign");
+			}
+			else if(leftViewStack.selectedIndex == 1) // Cloud Library
+			{
+				this.setCurrentState("cloudLibrary");
+				Application(this.parentApplication).setCurrentState("cloudLibrary");
+			}
+		}
+
+
+		private function onItemClickBrowseBtn(event:ItemClickEvent):void
+		{
+			if(!event.item)
+				return;
+
+			if(event.item.name == "back") // back
+			{
+				LibraryHistory.back();
+			}
+			else if(event.item.name == "forward") // forward
+			{
+				LibraryHistory.forward();
+			}
+			else if(event.item.name == "refresh") // forward
+			{
+				LibraryHistory.refresh();
+			}
+			else if(event.item.name == "stop") // forward
+			{
+				LibraryHistory.stop();
+			}
+		}
+
+
+
+		public function onClickAdvancedSearch():void
+		{
+			if(cloudLibraryPanel.cloudLibraryBrowser.currentState == 'normal')
+			{
+				cloudLibraryPanel.cloudLibraryBrowser.setCurrentState('advanced');
+				//advancedSearchBtn.label = 'Normal';
+			}
+			else // advanced
+			{
+				cloudLibraryPanel.cloudLibraryBrowser.setCurrentState('normal');
+				//advancedSearchBtn.label = 'Advanced';
+			}
+		}
+		
+		
+    ]]>
+    </mx:Script>
+
+
+	<mx:Style>
+
+		.CloudLibraryTab
+		{
+			paddingLeft: 0;
+			labelPlacement: right;
+			cornerRadius: 20;
+		}
+
+	</mx:Style>
+
+
+
+	<mx:HBox width="100%"
+		horizontalAlign="center" verticalAlign="bottom"
+		verticalGap="0" paddingTop="0">
+
+		<!-- MY CLOUDS / CLOUD LIBRARY Buttons -->
+		<mx:TabBar id="myCloudsLibTabBar" width="100%" height="32"
+			dataProvider="{leftViewStack}"
+			buttonHeight="32"
+			buttonStyleName="CloudLibraryTab"
+			borderStyle="none"
+			paddingBottom="0"/>
+
+		<mx:Spacer id="libSpacer" width="100%" height="0"/>
+
+
+		<!-- LIBRARY Browser Buttons -->
+		<mx:HBox id="libraryBox"
+			includeInLayout="false" visible="{libraryBox.includeInLayout}">
+
+			<!--mx:LinkBar id="browseBtnBar" height="23"
+				paddingTop="0" paddingBottom="0"
+				borderStyle="solid" borderSides="left, top, right"
+				itemClick="onItemClickBrowseBtn(event)">
+				<mx:Array>
+					<mx:Object name="back" icon="{Globals.g_assets.UndoIcon}" toolTip="Go Back"/>
+					<mx:Object name="forward" icon="{Globals.g_assets.RedoIcon}" toolTip="Go Forward"/>
+					<mx:Object name="refresh" icon="{Globals.g_assets.RefreshIcon}" toolTip="Refresh"/>
+					<mx:Object name="stop" icon="{Globals.g_assets.DeleteCloudIcon}" toolTip="Stop"/>
+				</mx:Array>
+			</mx:LinkBar-->
+
+			<!--mx:LinkButton id="advancedSearchBtn" label="Advanced" 
+				width="100"
+			 	click="onClickAdvancedSearch()"/-->
+
+		</mx:HBox>
+
+	</mx:HBox>
+
+
+	<!-- MY CLOUDS / CLOUD LIBRARY ViewStack -->
+	<mx:ViewStack id="leftViewStack" width="100%" height="100%"
+		borderStyle="none" borderThickness="0"
+		paddingTop="0"
+		creationPolicy="auto"
+		change="onChangeChildView(event)">
+
+	    <cloudTree:CloudTreePanel id="cloudTreePanel" label="My Clouds" width="100%" height="100%" />
+
+		<cloudLibrary:CloudLibrary id="cloudLibraryPanel" label="Cloud Library" width="100%" height="100%"
+			icon="{Globals.g_assets.TriCloudIcon16}"
+			metaCloudPanel="{metaCloudPanel}" />
+
+	</mx:ViewStack>
+
+
+
+	<mx:states>
+		<mx:State name="myClouds">
+			<mx:SetProperty target="{myCloudsLibTabBar}" name="width" value="100%" />
+			<mx:SetProperty target="{libSpacer}" name="includeInLayout" value="false" />
+			<mx:SetProperty target="{libraryBox}" name="includeInLayout" value="false" />
+		</mx:State>
+
+		<mx:State name="cloudLibrary">
+			<mx:SetProperty target="{myCloudsLibTabBar}" name="width" value="{myCloudsLibTabBar.width}" />
+			<mx:SetProperty target="{libSpacer}" name="includeInLayout" value="true" />
+			<mx:SetProperty target="{libraryBox}" name="includeInLayout" value="true" />
+		</mx:State>
+	</mx:states>
+
+
+</mx:Panel>

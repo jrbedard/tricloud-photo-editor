@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:HSlider xmlns:mx="http://www.adobe.com/2006/mxml"
+	minimum="0" maximum="50" width="125"
+	liveDragging="true" snapInterval="1"
+	tickInterval="5" tickColor="0x000000" tickThickness="1"
+	labels="['0','25','50']"
+	toolTip="Select Distance"
+	dataTipFormatFunction="dataTipFunc"
+
+	thumbPress="CloudCursor.SetCursor(CloudCursor.TRANSLATE_HORI);"
+	thumbRelease="CloudCursor.SetCursor(CloudCursor.NORMAL);">
+
+
+	<mx:Script>
+    <![CDATA[
+
+		// TODO: Make the value exponancial like Photoshop
+
+		private function dataTipFunc(val:Number):String
+		{
+			return val.toString();
+		}
+
+	]]>
+    </mx:Script>
+
+	
+</mx:HSlider>

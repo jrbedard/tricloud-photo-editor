@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Button xmlns:mx="http://www.adobe.com/2006/mxml"
+	width="36" height="36"
+	toolTip="{selectedBrush.name} Brush"
+	buttonMode="true"
+
+	selectedUpSkin="controls.colorClasses.ColorButtonSkin"
+	selectedOverSkin="controls.colorClasses.ColorButtonSkin"
+	upSkin="controls.colorClasses.ColorButtonSkin"
+	overSkin="controls.colorClasses.ColorButtonSkin"
+	downSkin="controls.colorClasses.ColorButtonSkin"
+	selectedDownSkin="controls.colorClasses.ColorButtonSkin"
+	disabledSkin="controls.colorClasses.ColorButtonSkin"
+	selectedDisabledSkin="controls.colorClasses.ColorButtonSkin"
+
+	creationComplete="onCreationComplete()">
+
+
+	<mx:Script>
+    <![CDATA[
+
+		import mx.managers.PopUpManager;
+
+		import controls.brushClasses.*;
+
+
+		private var brushDialog:BrushDialog = BrushDialog.brushDialog;
+		private var brushDialogVisible:Boolean = false; // panel open
+
+
+
+		private var _selectedBrush:CloudBrush = new CloudBrush(); // select default brush by default
+
+		private var brushMatrix:Matrix = new Matrix();
+
+		private var _brushSize:uint = 1;
+
+
+
+		private function onCreationComplete():void
+		{
+			brushDialog.addEventListener("brushChanged", onBrushChanged);
+			brushDialog.addEventListener("close", onCloseBrushPanel);
+
+			UpdateButtonImage();
+		}
+
+
+
+		public function set selectedBrush(brush:CloudBrush):void
+		{
+			_selectedBrush = brush;
+			UpdateButtonImage();
+		}
+		[Bindable]
+		public function get selectedBrush():CloudBrush
+		{
+			return _selectedBrush;
+		}
+
+
+		[Inspectable(defaultValue=null)]
+		public function set brushSize(size:uint):void
+		{
+			_brushSize = size;
+			_selectedBrush.size = _brushSize;
+		}
+		[Bindable]
+		public function get brushSize():uint
+		{
+			return _brushSize;
+		}
+		
+
+
+	
+		protected override function clickHandler(event:MouseEvent):void
+		{
+			event.stopPropagation(); // Dont continue click event on something below this control
+
+			if(!brushDialogVisible)
+			{
+				CloudDialogManager.OpenDialog(brushDialog, this);
+				brushDialogVisible = true;
+
+				brushDialog.brushGrid.selectedItem = selectedBrush;
+			}
+			else
+			{
+				CloudDialogManager.CloseDialog(brushDialog);
+				brushDialogVisible = false;
+			}
+		}
+
+		// A brush was selected
+		private function onBrushChanged(event:BrushEvent):void
+		{
+			selectedBrush = event.brush;
+			UpdateButtonImage();
+
+			this.dispatchEvent(new Event("change")); // selected Brush changed
+		}
+
+
+		private function onCloseBrushPanel(event:Event):void
+		{
+			CloudDialogManager.CloseDialog(brushDialog);
+			brushDialogVisible = false;
+		}
+
+
+		private function UpdateButtonImage():void
+		{
+			if(!selectedBrush || !selectedBrush.iconBitmap)
+				return;
+
+			brushMatrix.createBox((this.width-8)/32, 
+								  (this.height-8)/32,
+								  0,
+								  4,4);
+
+			this.graphics.clear();
+			this.graphics.beginBitmapFill(selectedBrush.iconBitmap.bitmapData, brushMatrix, false, true);
+			this.graphics.drawRect(4,4, this.width-8, this.height-8);
+			this.graphics.endFill();
+		}
+
+
+	]]>
+    </mx:Script>
+
+</mx:Button>

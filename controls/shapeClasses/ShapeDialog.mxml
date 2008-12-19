@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:cloudControls="cloud.controls.*" 
+	width="220" height="210"
+	layout="vertical"
+	titleIcon="{Globals.g_assets.DrawCustomShapeIcon}"
+	title="Shapes"
+	horizontalScrollPolicy="off" verticalScrollPolicy="off"
+	showCloseButton="true"
+
+	styleName="CloudDialog"
+	titleStyleName="CloudDialogTitle"
+	paddingTop="0" paddingBottom="0"
+
+	creationComplete="onCreationComplete()">
+
+
+	<mx:Script>
+    <![CDATA[
+
+		import mx.events.ListEvent;
+		import mx.collections.ArrayCollection;
+		import mx.managers.PopUpManager;
+
+		import library.CloudLibraryBrowseEvent;
+		import share.ShareController;
+
+
+		// Static instance, singleton
+		public static var shapeDialog:ShapeDialog = new ShapeDialog();
+
+		private var shapeCreation:ShapeCreation = ShapeCreation.shapeCreation;
+
+
+		[Bindable]
+		public var shapeList:ArrayCollection = new ArrayCollection(); // Array of Shapes
+
+
+
+		private function onCreationComplete():void
+		{
+			PopulateBrushList();
+
+			shapeGrid.selectedIndex = 0;
+
+			// Set the Right Click menu for this Dialog
+   			var rightClickMenu:RightClickMenu = new RightClickMenu(this.title);
+   			this.contextMenu = rightClickMenu.triCloudContextMenu;
+   
+   			shapeCreation.addEventListener('newShape', onNewShapeCreated);
+		}
+
+		private function PopulateBrushList():void
+		{
+			var shapeFactory:ShapeFactory = new ShapeFactory();
+			shapeFactory.Populate(shapeList);
+		}
+
+		public function AddCloudShape(cloudShapeXML:XML):void
+		{
+			// todo: bitmap
+
+			var newShape:CloudShape = new CloudShape();
+			newShape.Load(cloudShapeXML);
+
+			shapeList.addItem(newShape);
+		}
+
+
+		private function onItemClickShapeList(event:ListEvent):void
+ 		{
+ 			this.dispatchEvent(new ShapeEvent("shapeChanged", event.target.selectedItem as CloudShape));
+ 		}
+
+		private function onItemDoubleClickShapeList(event:ListEvent):void
+		{
+			onItemClickShapeList(event);
+			this.dispatchEvent(new Event('close'))
+		}
+
+
+		private function onClickBrowse():void
+		{
+			// Open the Cloud Library to browse/search for Brushes
+			TriCloud(this.parentApplication).dispatchEvent(
+				new CloudLibraryBrowseEvent("browseCloudLibrary", '', "useCount", CloudType.ST_SHAPE));
+		}
+
+		private function onClickCreateShape():void
+		{
+			PopUpManager.addPopUp(shapeCreation, this.parentApplication as DisplayObject, false);
+			PopUpManager.centerPopUp(shapeCreation); // Center Shape Creation dialog
+
+			// Hide Shape Dialog, evil
+			//this.visible = false;
+		}
+		
+		private function onNewShapeCreated(shapeEvent:ShapeEvent):void
+		{
+			// Show Shape Dialog
+			//this.visible = true;
+
+			// Add new shape to list
+			shapeList.addItemAt(shapeEvent.shape, 0); // add on top
+
+			shapeGrid.validateNow();
+		}
+
+		private function onClickShareShape():void
+		{
+			var shareController:ShareController = CloudEngine.GetInstance().GetShareController();
+			shareController.ShareCloud(shapeGrid.selectedItem as CloudShape, CloudType.ST_SHAPE);
+
+			// Close Shape Dialog
+			this.dispatchEvent(new Event("close"));
+		}
+
+
+  	]]>
+    </mx:Script>
+
+
+	<!-- SHAPE LIST -->
+	<mx:TileList id="shapeGrid" width="100%" height="100%"
+		wordWrap="true"
+		allowDragSelection="false" dragEnabled="false" dropEnabled="false"
+		rowCount="5" rowHeight="36"
+		columnCount="5" columnWidth="36"
+		doubleClickEnabled="true"
+
+		verticalAlign="middle"
+		backgroundAlpha="0.5"
+		dropShadowEnabled="false"
+
+		dataProvider="{shapeList}"
+		itemRenderer="controls.shapeClasses.ShapeItem"
+		itemClick="onItemClickShapeList(event)"
+		itemDoubleClick="onItemDoubleClickShapeList(event)"/>
+
+
+	<mx:ControlBar width="100%"
+		horizontalAlign="center"
+		paddingBottom="3" paddingLeft="0" paddingRight="0" paddingTop="3">
+
+		<mx:Button id="browseButton" icon="{Globals.g_assets.TriCloudIcon16}"
+			toolTip="Browse/Search Shapes in the Cloud Library"
+			click="onClickBrowse()" />
+
+		<mx:Button id="createShapeBtn" icon="{Globals.g_assets.AddTagIcon}" 
+			toolTip="Create Shape"
+			click="onClickCreateShape()" />
+
+		<mx:Button id="shareShapeBtn" icon="{Globals.g_assets.ShareIcon}"
+			toolTip="Share this Shape"
+			click="onClickShareShape(); // Dislpay Button only if Brush's remoteID == '0'"/>
+
+	</mx:ControlBar>
+
+
+</mx:TitleWindow>

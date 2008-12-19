@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:cloudPanels="panels.*"
+	width="400" height="300"
+	titleIcon="{Globals.g_assets.FlagIcon}"
+	title="Flag ''{metaCloud.@name}'' as Inappropriate Content"
+	layout="vertical"
+	horizontalScrollPolicy="off" verticalScrollPolicy="off"
+	showCloseButton="true"
+
+	styleName="CloudDialog"
+	titleStyleName="CloudDialogTitle"
+	horizontalAlign="center" verticalAlign="middle"
+
+	creationComplete="onCreationComplete()"
+	close="onClickCancel()">
+
+
+	<mx:Script>
+    <![CDATA[
+
+		import mx.events.CloseEvent;
+		import mx.managers.PopUpManager;
+
+    	import events.CloudFlagEvent;
+
+
+
+		// Static instance, singleton
+		public static const flagDialog:FlagDialog = new FlagDialog();
+
+		[Bindable]
+		public var metaCloud:XML = null;
+
+
+		private function onCreationComplete():void
+    	{
+			// Set the Right Click menu for this Dialog
+   			var rightClickMenu:RightClickMenu = new RightClickMenu(this.title);
+   			this.contextMenu = rightClickMenu.triCloudContextMenu;
+    	}
+
+		private function onClickFlag():void
+		{
+			this.dispatchEvent(new CloudFlagEvent('flagCloud', metaCloud, flagReasonComboBox.selectedIndex, ''));
+		}
+
+		private function onClickCancel():void
+		{
+			PopUpManager.removePopUp(flagDialog);
+		}
+
+ 	]]>
+    </mx:Script>
+
+
+	<!-- FLAG CLOUD -->
+
+	<mx:Label text="Help us make TriCloud a clean, fun service to use" />
+	<mx:Label text="by flagging Inappropriate content." />
+	<mx:Label text="Tell us why the Cloud ''{metaCloud.@name}'' is inappropriate." />
+
+	<mx:Form id="flagCloud"
+		width="100%"
+		horizontalScrollPolicy="off" verticalScrollPolicy="off"
+		verticalGap="7"
+		paddingLeft="5" paddingTop="10" paddingBottom="5" paddingRight="5">
+
+		<mx:FormItem label="Reason:" width="100%">
+			<mx:ComboBox id="flagReasonComboBox">
+				<mx:Array id="flagReasons">
+					<mx:Object name="violent" label="Violent" toolTip="Violent" />
+					<mx:Object name="pornographic" label="Pornographic" toolTip="Pornographic" />
+					<mx:Object name="copyrighted" label="Copyrighted Material" toolTip="Copyrighted Material" />
+					<mx:Object name="broken" label="Broken, Buggy Content" toolTip="Broken, Buggy Content" />
+				</mx:Array>
+			</mx:ComboBox>
+		</mx:FormItem>
+
+	</mx:Form>
+
+    <mx:ControlBar>
+		<mx:Button id="flagButton" label="Flag Cloud" click="onClickFlag()" styleName="OkButton" icon="{Globals.g_assets.FlagIcon}" />	
+		<mx:Button id="cancelButton" label="Cancel" click="onClickCancel()" styleName="CancelButton" />		
+	</mx:ControlBar>
+    
+</mx:TitleWindow>

@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Button xmlns:mx="http://www.adobe.com/2006/mxml"
+	width="175" height="28"
+	label="{selectedFont.name}"	
+	toolTip="{selectedFont.name} Font"
+	buttonMode="true"
+
+    fontFamily="{selectedFont.name}"
+    fontSize="18"
+    fontAntiAliasType="advanced"
+    fontWeight="normal"
+
+  	labelPlacement="left"
+  	verticalGap="0"
+  	paddingTop="5" paddingBottom="5"
+
+    creationComplete="onCreationComplete()">
+
+
+	<mx:Script>
+    <![CDATA[
+
+		import mx.managers.PopUpManager;
+
+		import controls.fontClasses.*;
+
+
+		private var fontDialog:FontDialog = FontDialog.fontDialog;
+		private var fontDialogVisible:Boolean = false; // panel open
+
+
+		private var _selectedFont:CloudFont = new CloudFont(); // selected font
+
+
+
+		public function set selectedFont(font:CloudFont):void
+		{
+			_selectedFont = font;
+		}
+		[Bindable]
+		public function get selectedFont():CloudFont
+		{
+			return _selectedFont;
+		}
+
+
+		public function set selectedFontName(fontName:String):void
+		{
+			// Search for font ...
+			selectedFont = fontDialog.GetFontByName(fontName);
+		}
+		[Bindable]
+		public function get selectedFontName():String
+		{
+			return selectedFont.name;
+		}
+
+
+
+
+
+		private function onCreationComplete():void
+		{
+			fontDialog.addEventListener("fontChanged", onFontChanged);
+			fontDialog.addEventListener("close", onCloseFontDialog);
+		}
+
+
+		protected override function clickHandler(event:MouseEvent):void
+		{
+			event.stopPropagation(); // Dont continue click event on something below this control
+
+			if(!fontDialogVisible)
+			{
+				CloudDialogManager.OpenDialog(fontDialog, this);
+				fontDialogVisible = true;
+
+				fontDialog.fontGrid.selectedItem = this.selectedFont;
+			}
+			else
+			{
+				CloudDialogManager.CloseDialog(fontDialog);
+				fontDialogVisible = false;
+			}
+		}
+
+
+		private function onFontChanged(event:FontEvent):void
+		{
+			selectedFont = event.font;
+
+			// measure text width
+			var textWidth:uint = this.measureText(selectedFont.name).width;
+			if(textWidth > this.width)
+			{
+				//textWidth // scale down here
+			}
+
+			this.dispatchEvent(new Event("change")); // selected font changed
+		}
+
+
+
+		private function onCloseFontDialog(event:Event):void
+		{
+			CloudDialogManager.CloseDialog(fontDialog);
+			fontDialogVisible = false;
+		}
+		
+
+    ]]>
+    </mx:Script>
+
+	
+	
+
+</mx:Button>

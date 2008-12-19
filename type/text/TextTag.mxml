@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TextArea xmlns:mx="http://www.adobe.com/2006/mxml"
+	mouseFocusEnabled="false"
+	focusEnabled="false"
+	focusThickness="0"
+	focusAlpha="1.0"
+	focusRect="null"
+
+	horizontalScrollPolicy="off" verticalScrollPolicy="off"
+	horizontalScrollPosition="0" verticalScrollPosition="0"
+	editable="true"
+	wordWrap="false"
+
+	borderStyle="none"
+	themeColor="0"
+
+	color="{textStyle.color}"
+	alpha="{textStyle.alpha}"
+	backgroundColor="{textStyle.backgroundColor}"
+	backgroundAlpha="{textStyle.backgroundAlpha}"
+
+	textAlign="{textStyle.textAlign}"
+	textIndent="{textStyle.textIndent}"
+	leading="{textStyle.leading}"
+	textDecoration="{textStyle.textDecoration}"
+
+	fontFamily="{textStyle.fontFamily}"
+	fontSize="{textStyle.fontSize}"
+	fontWeight="{textStyle.fontWeight}"
+	fontStyle="{textStyle.fontStyle}"
+
+	fontAntiAliasType="{textStyle.fontAntiAliasType}"
+	fontThickness="{textStyle.fontThickness}"
+	fontSharpness="{textStyle.fontSharpness}"
+	fontGridFitType="{textStyle.fontGridFitType}"
+
+ 	creationComplete="onCreationComplete()"
+	change="onChangeTextArea()">
+
+
+	<mx:Script>
+    <![CDATA[
+
+		import mx.containers.Canvas;
+
+		import core.Cloud;
+
+
+		[Bindable]
+		public var textStyle:TextStyle = null;
+
+
+		[Bindable]
+		public var warpFilter:DisplacementMapFilter = new DisplacementMapFilter();
+
+
+
+
+		private function onCreationComplete():void
+		{
+  			this.focusManager.deactivate(); // Desactivate focus because it creates a border around the textArea that mess up the boundingRectangle
+		}
+
+		override protected function measure():void
+		{
+			super.measure();
+		}
+
+
+		private function onChangeTextArea():void
+		{
+			this.invalidateDisplayList();
+		}
+
+
+
+		override protected function updateDisplayList(unscaledWidth:Number, unscaledHeight:Number):void
+		{
+			// Resize the width and Height of the TextTag according to the size of the text within
+			unscaledWidth = this.textWidth + measureText("W").leading + measureText("W").width; // resize Width
+			unscaledHeight = this.textHeight + measureText(" ").height; // reize Height
+
+			super.updateDisplayList(unscaledWidth, unscaledHeight);
+
+			Cloud(this.parent).UpdateBoundingShape(); // Update textCloud (and boundingRectangle)
+		}
+
+
+
+		override public function set horizontalScrollPosition(value:Number):void
+    	{
+    		super.horizontalScrollPosition = 0; // always 0, no horizontal scrolling within a Cloud!
+    	}
+
+		override public function set verticalScrollPosition(value:Number):void
+    	{
+    		super.verticalScrollPosition= 0; // always 0, no vertical scrolling within a Cloud!
+    	}
+
+		override protected function mouseWheelHandler(event:MouseEvent):void
+		{
+			// override textArea mouseWheel Handler, so it doesnt bypass, canvas's zoom
+		}
+
+
+		public function UpdateWarp():void
+		{
+			var textFilters:Array = this.filters;
+
+			warpFilter.mapBitmap = textStyle.selectedWarp.dispMap.bitmapData; // TODO: make a copy
+			warpFilter.mapPoint = new Point(0, 0);
+			warpFilter.componentX = BitmapDataChannel.RED;
+			warpFilter.componentY = BitmapDataChannel.RED;
+			warpFilter.scaleX = 0.5;
+            warpFilter.scaleY = -30;
+			warpFilter.mode = DisplacementMapFilterMode.CLAMP;
+			warpFilter.color = 0;
+            warpFilter.alpha = 0;
+
+			textFilters.push(warpFilter);
+			this.filters = textFilters;
+		}
+
+	]]>
+    </mx:Script>
+
+</mx:TextArea>

@@ -1,0 +1,555 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:core="core.*"
+	minWidth="25" minHeight="25"
+	scaleX="1.0" scaleY="1.0"
+	clipContent="true"
+	currentState="unLocked"
+	alpha="0.0"
+	horizontalScrollPolicy="off" verticalScrollPolicy="off"
+ 
+	borderSkin="core.CloudNavBorder"
+	borderStyle="solid"
+
+	creationComplete="onCreationComplete()">
+
+
+	<mx:Script>
+    <![CDATA[
+
+    	import flash.geom.Point;
+    	import mx.containers.Grid;
+		import mx.containers.Panel;
+		import mx.managers.DragManager;
+		import mx.events.DragEvent;
+		import mx.binding.utils.*;
+
+		import core.Cloud;
+		import events.*;
+
+
+		[Bindable]
+		private var m_cloud:Cloud = null; // Selected/active cloud
+
+		[Bindable]
+		public var canvas:CanvasCloud = null;
+
+
+
+		// translation, rotation and scaling transformation handler
+		private var cloudTransformer:CloudTransformer = new CloudTransformer();
+
+		private const pad:uint = 32;
+
+		// Rotation offset, better than before	
+		private var rotOffset:Point = new Point();
+
+
+		[Bindable]
+		public var cloudSnap:Boolean = true; // Cloud Snap to canvas's border within range
+
+		public var cloudSnapVal:Number = 10;
+		public var cloudSnapRange:Point = new Point(cloudSnapVal, cloudSnapVal); //x,y  snap when +-10 pixels from border
+
+
+		private function onCreationComplete():void
+		{
+			this.mouseEnabled = false; // disable mouse event on the navigator itself (not its children)
+
+			// Set the Right Click menu for this Dialog
+   			var rightClickMenu:RightClickMenu = null;
+   			if(m_cloud)
+   				rightClickMenu = new RightClickMenu(m_cloud.name);
+   			else
+   				rightClickMenu = new RightClickMenu('Cloud');
+   			this.contextMenu = rightClickMenu.triCloudContextMenu;
+		}
+
+
+		public function SetCloud(_cloud:Cloud):void
+		{
+			if(!_cloud) // if null, unselect all
+			{
+				this.currentState="unLocked";
+				return;
+			}
+
+			m_cloud = _cloud;
+			cloudTransformer.SetCloud(m_cloud);
+
+			// TODO: are they added each time. shouldnt they killed?
+
+
+			// Canvas changed size / scaling
+			BindingUtils.bindSetter(onCloudSizeChanged, canvas, "scaleX");
+			BindingUtils.bindSetter(onCloudSizeChanged, canvas, "scaleY");
+			
+			// Canvas changed position
+			BindingUtils.bindSetter(onCloudPosChanged, canvas, "x");
+			BindingUtils.bindSetter(onCloudPosChanged, canvas, "y");
+
+			
+			// Call onCloudSizeChanged when the Cloud size change
+			BindingUtils.bindSetter(onCloudSizeChanged, m_cloud, "width");
+			BindingUtils.bindSetter(onCloudSizeChanged, m_cloud, "height");
+
+			BindingUtils.bindSetter(onCloudSizeChanged, m_cloud, "scaleX");
+			BindingUtils.bindSetter(onCloudSizeChanged, m_cloud, "scaleY");
+
+			// Call onCloudPosChanged when the Cloud position change
+			BindingUtils.bindSetter(onCloudPosChanged, m_cloud, "x");
+			BindingUtils.bindSetter(onCloudPosChanged, m_cloud, "y");
+
+			// Call onCloudRotChanged when the Cloud rotation change
+			BindingUtils.bindSetter(onCloudRotChanged, cloudTransformer, "rotation");
+			cloudTransformer.rotation = m_cloud.rotation;
+
+/*
+			if(m_cloud.type == CloudType.IMAGE) //image clouds can be dragged
+			{
+				m_cloud.addEventListener(MouseEvent.MOUSE_DOWN, onMouseDownImageCloud);
+			}
+			else
+			{
+				m_cloud.removeEventListener(MouseEvent.MOUSE_DOWN, onMouseDownImageCloud);
+			}
+*/
+
+			if(this.currentState != 'lockedCropMode')
+			{
+				// Lock on the new cloud
+				this.setCurrentState('locked');
+			}
+
+			// Init Size
+			onCloudSizeChanged(0);
+			// Init Position
+			onCloudPosChanged(0);
+		}
+
+
+
+		private function onCloudSizeChanged(value:Object):void
+		{
+			if(!m_cloud || !canvas) // valid cloud
+				return;
+
+			// TODO: this is lagging behing cloud's dimensions // NEEDS optimization
+
+			// Adjust Navigator width and height WITHOUT scaling it
+			this.width = (m_cloud.width * canvas.scaleX) + pad*2;
+			this.height = (m_cloud.height * canvas.scaleY) + pad*2;
+
+			//this.validateNow(); // doesnt help here
+		}
+
+
+		// Optimization hint: changing position onMouseDown seems faster
+		private function onCloudPosChanged(value:Object):void
+		{
+			if(!m_cloud || !canvas) // valid cloud, canvas and shirtPanel
+				return;
+
+// TODO: fix overflows
+/*
+			// Snaping
+			if(cloudSnap && m_cloud.rotation == 0)
+			{
+				var cloudBound:Rectangle = m_cloud.getBounds(canvas); // for if theres a rotation
+				cloudBound.inflate(canvas.scaleX, canvas.scaleY);
+
+				cloudSnapRange.x = cloudSnapVal * canvas.scaleX;
+				cloudSnapRange.y = cloudSnapVal * canvas.scaleY;
+
+				// X
+				if(cloudBound.left >= -cloudSnapRange.x && 
+				   cloudBound.left <= cloudSnapRange.x)
+				{
+					m_cloud.x = Number((0).toFixed(0)); // snap to canvas' left border
+				}
+
+				if((cloudBound.right * canvas.scaleX) >= (canvas.width - cloudSnapRange.x) &&
+				   (cloudBound.right * canvas.scaleX) <= (canvas.width + cloudSnapRange.x))
+				{
+					// fixed 0 to avoid stack overflow
+					m_cloud.x = Number((canvas.width - (cloudBound.width * canvas.scaleX)).toFixed(0)); // snap to canvas' right border
+				}
+
+				// Y
+				if(cloudBound.top >= -cloudSnapRange.y && 
+				   cloudBound.top <= cloudSnapRange.y)
+				{
+					m_cloud.y = Number((0).toFixed(0));  // snap to canvas' up border
+				}
+				if((cloudBound.bottom * canvas.scaleY) >= (canvas.height - cloudSnapRange.y) &&
+				   (cloudBound.bottom * canvas.scaleY) <= (canvas.height + cloudSnapRange.y))
+				{
+					// fixed 0 to avoid stack overflow
+					m_cloud.y = Number((canvas.height - (cloudBound.height * canvas.scaleY)).toFixed(0)); // snap to canvas' right border
+				}
+			}
+*/
+			// new position
+			this.x = (m_cloud.x * canvas.scaleX) + canvas.x - rotOffset.x;
+			this.y = (m_cloud.y * canvas.scaleY) + canvas.y - rotOffset.y;
+		}
+
+
+		private function onCloudRotChanged(value:Object):void
+		{
+			this.rotation = cloudTransformer.rotation; // retreive the rotation this way because cloud's rotation is not bindable
+
+			// Pre Compute rotation offset
+			var radVal:Number = Math.PI * this.rotation / 180;
+			rotOffset.x = pad * Math.cos(radVal) - pad * Math.sin(radVal);
+			rotOffset.y = pad * Math.sin(radVal) + pad * Math.cos(radVal);
+		}
+
+
+
+		// On Start a transformation
+		private function onMouseDownCloudTransform(transform:String, mouseEvent:MouseEvent):void
+		{
+			if(transform == "startTranslating") // onMouseDown on Navigator's translate button
+			{
+				this.setCurrentState("translating"); // NOW TRANSLATING
+				cloudTransformer.onMouseDownTranslateBtn(mouseEvent);
+			}
+			else if(transform == "startRotating") // onMouseDown on Navigator's rotate button
+			{
+				this.setCurrentState("rotating"); // NOW ROTATING
+				cloudTransformer.onMouseDownRotateBtn(mouseEvent);
+				// fadeIn..
+				UpdateRotateGizmo();
+				m_cloud.parentApplication.addEventListener(MouseEvent.MOUSE_MOVE, onMouseMoveAppRotation);
+			}
+			else if(transform == "startScaling") // onMouseDown on Navigator's scale button
+			{
+				this.setCurrentState("scaling"); // NOW SCALING
+				cloudTransformer.onMouseDownScaleBtn(mouseEvent, true, true);
+			}
+			else if(transform == "startHScaling" )
+			{
+				this.setCurrentState("scaling"); // NOW SCALING
+				cloudTransformer.onMouseDownScaleBtn(mouseEvent, true, false);
+			}
+			else if(transform == "startVScaling" )
+			{
+				this.setCurrentState("scaling"); // NOW SCALING
+				cloudTransformer.onMouseDownScaleBtn(mouseEvent, false, true);
+			}
+			else if(transform == "startLeftCropping" )
+			{
+				this.setCurrentState("cropping"); // NOW CROPPING
+				cloudTransformer.onMouseDownCropBtn(mouseEvent, "left");
+			}
+			else if(transform == "startBottomCropping" )
+			{
+				this.setCurrentState("cropping"); // NOW CROPPING
+				cloudTransformer.onMouseDownCropBtn(mouseEvent, "bottom");
+			}
+			else if(transform == "startRightCropping" )
+			{
+				this.setCurrentState("cropping"); // NOW CROPPING
+				cloudTransformer.onMouseDownCropBtn(mouseEvent, "right");
+			}
+			else if(transform == "startTopCropping" )
+			{
+				this.setCurrentState("cropping"); // NOW CROPPING
+				cloudTransformer.onMouseDownCropBtn(mouseEvent, "top");
+			}
+
+			// Listen For mouse UP
+			m_cloud.parentApplication.addEventListener(MouseEvent.MOUSE_UP, onMouseUpApp);
+		}
+
+
+
+		// 
+		private function onMouseMoveAppRotation(mouseEvent:MouseEvent):void
+		{
+			UpdateRotateGizmo();
+		}
+
+		// Use SWF instead??? with MovieClipLoaderAsset....
+		private function UpdateRotateGizmo():void
+		{
+			// Update SWF frame here.
+
+			// Circle
+			this.graphics.clear();
+			this.graphics.lineStyle(1, 0x000000, 1.0);
+			this.graphics.beginFill(0x000000, 0.5);
+			this.graphics.drawCircle(this.width*0.5, this.height*0.5, 5);
+			this.graphics.endFill();
+
+			// Rotation =0;
+			this.graphics.moveTo(this.width*0.5, this.height*0.5);
+			this.graphics.lineTo(this.width*0.5 + this.width*0.25, this.height*0.5);
+		}
+
+
+		// ON MouseUP 
+		private function onMouseUpApp(mouseEvent:MouseEvent):void
+		{
+			m_cloud.parentApplication.removeEventListener(MouseEvent.MOUSE_UP, onMouseUpApp);
+
+			if(this.currentState == 'rotating') // End Rotation
+			{
+				m_cloud.parentApplication.removeEventListener(MouseEvent.MOUSE_MOVE, onMouseMoveAppRotation);
+				this.graphics.clear(); // fadeOutRotate gizmo	
+			}
+			else if(this.currentState == 'cropping') // End Cropping
+			{
+				
+			}
+
+			// History
+			m_cloud.Transformed(this.currentState); // Hack for HistoryManagement
+
+
+			if(this.currentState == 'cropping')
+			{
+				this.setCurrentState('lockedCropMode');
+			}
+			else
+			{
+				this.setCurrentState('locked'); // Return to normal state
+			}
+
+			// Update Icon
+			m_cloud.UpdateIconBitmap();
+		}
+
+
+
+		private function onMouseDownImageCloud(mouseEvent:MouseEvent):void
+		{
+			if(this.currentState == 'lockedCropMode')
+				return;
+
+			this.setCurrentState("translating"); // NOW TRANSLATING
+			cloudTransformer.onMouseDownTranslateBtn(mouseEvent);
+
+			m_cloud.parentApplication.addEventListener(MouseEvent.MOUSE_UP, onMouseUpAppImageCloud);
+		}
+
+		private function onMouseUpAppImageCloud(event:MouseEvent):void
+		{
+			if(this.currentState == 'lockedCropMode')
+				return;
+
+			this.setCurrentState('locked');
+
+			CloudCursor.SetCursor(CloudCursor.NORMAL);
+		}
+
+
+
+		// ROLL translation
+		private function onRollOverCP(event:MouseEvent):void
+		{
+			if(this.currentState == 'locked' || this.currentState == 'lockedCropMode' 
+				&& !event.buttonDown)
+			{
+				if(event.currentTarget.id == 'topCP' ||
+				   event.currentTarget.id == 'bottomCP')
+				{
+					CloudCursor.SetCursor(CloudCursor.TRANSLATE_VERT);
+				}
+				else if(event.currentTarget.id == 'leftCP' ||
+						event.currentTarget.id == 'rightCP')
+				{
+					CloudCursor.SetCursor(CloudCursor.TRANSLATE_HORI);
+				}
+				else
+				{
+					CloudCursor.SetCursor(CloudCursor.TRANSLATE);
+				}
+			}
+		}
+
+		private function onRollOutCP(event:MouseEvent):void
+		{
+			if(this.currentState != 'lockedCropMode' && !event.buttonDown)
+			{
+				this.setCurrentState('locked');
+				CloudCursor.SetCursor(CloudCursor.NORMAL);
+			}
+		}
+
+
+		private function onDoubleClickScale(event:MouseEvent):void
+		{
+			//expand
+		}
+
+
+	]]>
+    </mx:Script>
+
+
+
+	<!-- TOP-LEFT CP -->
+	<core:CloudNavCP id="topLeftCP"
+		x="{pad - topLeftCP.width/2}" y="{pad - topLeftCP.height/2}"
+		color="0x00FF00"
+		rollOver="onRollOverCP(event);"
+		rollOut="onRollOutCP(event);"
+		mouseDown="onMouseDownCloudTransform('startTranslating', event);"/>
+	<mx:Label id="topLeftCPLabel" width="100" visible="false" fontFamily="fontRadio"
+		x="0" y="{topLeftCP.y - topLeftCPLabel.height}" 
+		text="pos: [{m_cloud.x.toFixed(0)},{m_cloud.y.toFixed(0)}]" />
+
+
+	<!-- TOP-RIGHT CP -->
+	<core:CloudNavCP id="topRightCP"
+		x="{this.width - pad - topRightCP.width/2}" y="{pad - topRightCP.height/2}"
+		color="0xFF0000"
+		rollOver="onRollOverCP(event);"
+		rollOut="onRollOutCP(event);"
+		mouseDown="onMouseDownCloudTransform('startRotating', event);"/>
+	<mx:Label id="topRightCPLabel" width="65" visible="false" fontFamily="fontRadio"
+		x="{this.width - topRightCPLabel.width}" y="{topRightCP.y - topRightCPLabel.height}" 
+		text="rot: {m_cloud.rotation.toFixed(0)}" />
+
+
+	<!-- BOTTOM-RIGHT CP -->
+	<core:CloudNavCP id="bottomRightCP"
+		x="{this.width - pad - bottomRightCP.width/2}" y="{this.height - pad - bottomRightCP.height/2}"
+		color="0x0000FF"
+		rollOver="onRollOverCP(event);"
+		rollOut="onRollOutCP(event);"
+		mouseDown="onMouseDownCloudTransform('startScaling', event);"/>
+
+	<!-- BOTTOM-LEFT CP -->
+	<core:CloudNavCP id="bottomLeftCP"
+		x="{pad - bottomLeftCP.width/2}" y="{this.height - pad - bottomLeftCP.height/2}"
+		color="0x0000FF"
+		doubleClickEnabled="true"
+		rollOver="onRollOverCP(event);"
+		rollOut="onRollOutCP(event);"
+		mouseDown="onMouseDownCloudTransform('startScaling', event);"
+		doubleClick="onDoubleClickScale(event);"/>
+
+
+
+	<!-- TOP CP : top VSCALE, VCROP -->
+	<core:CloudNavCP id="topCP"
+		x="{this.width/2 - topCP.width/2}" y="{pad - topCP.height/2}"
+		color="0xFFFF00"
+		rollOver="onRollOverCP(event);"
+		rollOut="onRollOutCP(event);"
+		mouseDown="if(this.currentState == 'lockedCropMode')
+		 		   onMouseDownCloudTransform('startTopCropping', event);
+				   else
+				   onMouseDownCloudTransform('startVScaling', event);"/>
+
+	<mx:Label id="topCPLabel" width="125" visible="false"
+		x="{this.width/2 - topCPLabel.width/2}" y="{topCP.y - topCPLabel.height}" 
+		text="scale: [{(m_cloud.scaleX * 100).toFixed(0)+'%'}, {(m_cloud.scaleY * 100).toFixed(0)+'%'}]" />
+
+
+	<!-- RIGHT CP : right HSCALE, HCROP -->
+	<core:CloudNavCP id="rightCP"
+		x="{this.width - pad - rightCP.width/2}" y="{this.height/2 - rightCP.height/2}"
+		color="0xFFFF00"
+		rollOver="onRollOverCP(event);"
+		rollOut="onRollOutCP(event);"
+		mouseDown="if(this.currentState == 'lockedCropMode')
+				   onMouseDownCloudTransform('startRightCropping', event);
+				   else
+				   onMouseDownCloudTransform('startHScaling', event);"/>
+
+
+	<!-- BOTTOM CP : bottom VSCALE, VCROP -->
+	<core:CloudNavCP id="bottomCP"
+		x="{this.width/2 - bottomCP.width/2}" y="{this.height - pad - bottomCP.height/2}"
+		color="0xFFFF00"
+		rollOver="onRollOverCP(event);"
+		rollOut="onRollOutCP(event);"
+		mouseDown="if(this.currentState == 'lockedCropMode')
+				   onMouseDownCloudTransform('startBottomCropping', event);
+				   else
+				   onMouseDownCloudTransform('startVScaling', event);"/>
+
+	<mx:Label id="bottomCPLabel" width="125" visible="false"
+		x="{this.width/2 - bottomCPLabel.width/2}" y="{this.height - bottomCPLabel.height}" 
+		text="dim: [{m_cloud.width.toFixed(0)}, {m_cloud.height.toFixed(0)}]" />
+
+
+	<!-- LEFT CP : left HSCALE, HCROP -->
+	<core:CloudNavCP id="leftCP"
+		x="{pad - leftCP.width/2}" y="{this.height/2 - leftCP.height/2}"
+		color="0xFFFF00"
+		rollOver="onRollOverCP(event);"
+		rollOut="onRollOutCP(event);"
+		mouseDown="if(this.currentState == 'lockedCropMode')
+				   onMouseDownCloudTransform('startLeftCropping', event);
+				   else
+				   onMouseDownCloudTransform('startHScaling', event);"/>
+
+
+
+
+	<mx:states>
+		<mx:State name="unLocked">
+			<mx:SetProperty target="{this}" name="alpha" value="0.0"/>
+			<mx:SetProperty target="{this}" name="mouseChildren" value="false"/>
+		</mx:State>
+
+		<mx:State name="locked">
+			<mx:SetProperty target="{this}" name="alpha" value="1.0"/>
+			<mx:SetProperty target="{this}" name="mouseChildren" value="true"/>
+		</mx:State>
+
+		<mx:State name="lockedCropMode" basedOn="locked">
+			<mx:SetProperty target="{topLeftCP}" name="visible" value="false"/>
+			<mx:SetProperty target="{topRightCP}" name="visible" value="false"/>
+			<mx:SetProperty target="{bottomLeftCP}" name="visible" value="false"/>
+			<mx:SetProperty target="{bottomRightCP}" name="visible" value="false"/>
+
+			<mx:SetProperty target="{leftCP}" name="color" value="0x00FFFF"/>
+			<mx:SetProperty target="{topCP}" name="color" value="0x00FFFF"/>
+			<mx:SetProperty target="{rightCP}" name="color" value="0x00FFFF"/>
+			<mx:SetProperty target="{bottomCP}" name="color" value="0x00FFFF"/>
+		</mx:State>
+
+
+
+		<mx:State name="translating" basedOn="locked">
+			<mx:SetProperty target="{topLeftCPLabel}" name="visible" value="true"/>
+		</mx:State>
+
+		<mx:State name="rotating" basedOn="locked">
+			<mx:SetProperty target="{topRightCPLabel}" name="visible" value="true"/>
+		</mx:State>
+
+		<mx:State name="scaling" basedOn="locked">
+			<mx:SetProperty target="{topCPLabel}" name="visible" value="true"/>
+			<mx:SetProperty target="{bottomCPLabel}" name="visible" value="true"/>
+		</mx:State>	
+
+		<mx:State name="cropping" basedOn="lockedCropMode">
+			<mx:SetProperty target="{bottomCPLabel}" name="visible" value="true"/>
+		</mx:State>
+	</mx:states>
+
+
+	<!-- STATE TRANSITIONS -->
+	<mx:transitions>
+		<mx:Transition fromState="unLocked" toState="locked">
+			<!--mx:Parallel>
+				<mx:Fade target="{this}" alphaFrom="0.0" alphaTo="1.0" duration="200" />
+			</mx:Parallel-->
+		</mx:Transition>
+
+		<mx:Transition fromState="locked" toState="unLocked">
+			<!--mx:Parallel>
+				<mx:Fade target="{this}" alphaFrom="1.0" alphaTo="0.0" duration="200" />
+			</mx:Parallel-->
+		</mx:Transition>
+
+	</mx:transitions>
+
+
+</mx:Canvas>

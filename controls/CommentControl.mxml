@@ -1,0 +1,251 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml" 
+	width="100%" height="100%"
+	currentState="view"
+	
+	creationComplete="onCreationComplete()">
+
+
+	<mx:Script>
+    <![CDATA[
+ 
+ 		import mx.collections.XMLListCollection;
+ 		import mx.rpc.remoting.RemoteObject;
+        import mx.rpc.events.*;
+        import mx.controls.Alert;
+        import mx.managers.CursorManager;
+        import mx.managers.PopUpManager;
+
+ 		import controls.commentClasses.CommentEvent;
+        import user.UserDialog;
+  
+  
+  
+		// User Dialog
+		private const userDialog:UserDialog = UserDialog.userDialog;
+
+		// RoR RO
+        private var cloudRemObj:RemoteObject = new RemoteObject();
+
+
+		[Bindable]
+		public var metaCloud:XML = null;
+
+
+		[Bindable]
+		public var comments:XMLList = null;
+
+
+
+
+		private function onCreationComplete():void
+		{
+			this.addEventListener('flagComment', onFlagComment);
+			this.addEventListener('deleteComment', onDeleteComment);
+			this.addEventListener('editComment', onEditComment);
+			this.addEventListener('clickAuthor', onClickCommentAuthor);
+
+			// Remote object events
+			cloudRemObj.destination = "CloudService";
+        	cloudRemObj.addEventListener("fault", onFault);
+
+			cloudRemObj.listComments.addEventListener("result", onResultListComments);
+        	cloudRemObj.createComment.addEventListener("result", onResultCreateComment);
+        	cloudRemObj.updateComment.addEventListener("result", onResultUpdateComment);
+        	cloudRemObj.deleteComment.addEventListener("result", onResultDeleteComment);
+		}
+
+
+		// LIST COMMENTS
+		public function ListComments():void
+		{
+			if(!metaCloud)
+			{
+				Alert.show('Comments: Invalid Cloud', 'Comment Error');
+				return;
+			}
+
+			var cloudID:String = metaCloud.@id;
+
+			// list comments for this cloud
+			cloudRemObj.listComments(cloudID);
+		}
+
+		private function onResultListComments(event:ResultEvent):void 
+    	{
+			// Retreive list of comments for this cloud
+			comments = XMLList(event.result).descendants();
+
+			// Number of comments
+			this.label = comments.length() + " Comments:";
+		}
+
+
+
+		// ADD COMMENT
+		private function onClickAddComment():void
+		{
+			this.setCurrentState('edit');
+			bodyText.text = '';
+		}
+
+		private function onClickPostComment():void
+		{
+			// Create new XML Comment
+			var commentXML:XML = new XML("<comment></comment>"); 
+			commentXML.@cloudID = '1'; // TODO
+			commentXML.@userID =  '1'; // TODO
+			commentXML.@body = bodyText.text;
+
+			// Submit Comment XML to backEnd
+			cloudRemObj.createComment(commentXML.toXMLString());
+
+			CursorManager.setBusyCursor();
+		}
+
+		private function onResultCreateComment(event:ResultEvent):void 
+    	{
+    		CursorManager.removeBusyCursor();
+
+    		this.setCurrentState('view');
+
+			ListComments();
+    	}
+
+
+
+		private function onClickCancelComment():void
+		{
+			this.setCurrentState('view');
+		}
+
+
+
+		// FLAG COMMENT
+		private function onFlagComment(event:CommentEvent):void
+		{
+			
+		}
+
+
+		// EDIT COMMENT
+		private function onEditComment(event:CommentEvent):void
+		{
+			var commentXML:XML = event.comment;
+
+			// Update Comment XML on backEnd
+			cloudRemObj.updateComment(commentXML.toXMLString());
+		}
+
+		private function onResultUpdateComment(event:ResultEvent):void 
+    	{
+    		CursorManager.removeBusyCursor();
+
+    		ListComments();
+    	}
+
+
+		// CLICK COMMENT AUTHOR		
+		private function onClickCommentAuthor(event:CommentEvent):void
+		{
+			PopUpManager.addPopUp(userDialog, this.parentApplication as DisplayObject, false);
+			PopUpManager.centerPopUp(userDialog); // Center Image dialog
+		}
+
+
+
+		// DELETE COMMENT
+		private function onDeleteComment(event:CommentEvent):void
+		{
+			var commentID:String = event.comment.@id;
+
+			// Delete Comment on backEnd
+			cloudRemObj.deleteComment(commentID);
+
+			CursorManager.setBusyCursor();
+		}
+
+		private function onResultDeleteComment(event:ResultEvent):void 
+    	{
+    		CursorManager.removeBusyCursor();
+
+    		ListComments();
+    	}
+
+
+		// FAULT
+		private function onFault(event:FaultEvent):void 
+        {
+            CloudAlert.show(event.fault.faultString, 'Comment Error');
+
+			CursorManager.removeBusyCursor(); // Hide the busy cursor
+        }
+
+
+	]]>
+    </mx:Script>
+
+
+
+	<!-- COMMENTS -->
+	<mx:List id="commentList"
+		width="100%" height="100%"
+		useRollOver="false" 
+		selectable="false"
+		allowDragSelection="false"
+		dragEnabled="false" dropEnabled="false" dragMoveEnabled="false"
+
+		dataProvider="{comments}"
+		itemRenderer="controls.commentClasses.CommentItem"
+		/>
+
+
+	<!-- POST COMMENT BOX -->
+	<mx:VBox id="postCommentBox" width="100%" 
+		visible="false" includeInLayout="{postCommentBox.visible}"
+		borderStyle="solid" borderColor="0xFF00FF">
+
+		<mx:Label text="Add your Comment here:"/>
+
+		<mx:TextArea id="bodyText" width="100%" height="100%"
+			editable="true"
+			horizontalScrollPolicy="off" verticalScrollPolicy="auto"/>
+
+	</mx:VBox>
+
+
+	<!-- COMMENTS ACTIONS -->
+	<mx:ControlBar width="100%"
+		horizontalAlign="center" verticalAlign="middle">
+
+		<mx:Button id="addCommentBtn" label="Add Comment" 
+			visible="true" includeInLayout="{addCommentBtn.visible}"
+			click="onClickAddComment()" />
+
+		<mx:Button id="postCommentBtn" label="Post Comment" 
+			visible="false" includeInLayout="{postCommentBtn.visible}"
+			click="onClickPostComment()" />
+
+		<mx:Button id="cancelCommentBtn" label="Cancel" 
+			visible="{postCommentBtn.visible}" includeInLayout="{postCommentBtn.visible}"
+			click="onClickCancelComment()" />
+
+	</mx:ControlBar>
+
+
+
+	<!-- COMMENTS CONTROL STATES -->
+	<mx:states>
+		<mx:State name="view">
+			
+		</mx:State>
+
+		<mx:State name="edit">
+			<mx:SetProperty target="{addCommentBtn}" name="visible" value="false" />
+			<mx:SetProperty target="{postCommentBox}" name="visible" value="true" />
+			<mx:SetProperty target="{postCommentBtn}" name="visible" value="true" />
+		</mx:State>
+
+	</mx:states>
+
+</mx:VBox>

@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml" 
+	layout="vertical" width="200" height="300"
+	title="Session History"
+	horizontalScrollPolicy="off" verticalScrollPolicy="off"
+	showCloseButton="true"
+
+	styleName="CloudDialog"
+	titleStyleName="CloudDialogTitle"
+
+	creationComplete="onCreationComplete()">
+
+
+	<mx:Script>
+    <![CDATA[
+
+		import mx.events.ListEvent;
+		import mx.events.ItemClickEvent;
+		import mx.events.CollectionEvent;
+		import mx.collections.ArrayCollection;
+		import mx.controls.Alert;
+		import mx.controls.Label;
+
+
+		// Static instance, singleton
+		public static const historyDialog:HistoryDialog = new HistoryDialog();
+
+
+
+
+		private var _historyIndex:uint = 0; // history index
+
+		public function set historyIndex(index:uint):void
+		{
+			_historyIndex = index;
+			for(var i:uint = 0; i < CloudHistory.historyList.length; ++i) // for history item below historyIndex
+			{
+				var item:DisplayObject = actionList.indexToItemRenderer(i) as DisplayObject;
+				if(!item)
+					continue;
+
+				if(i <= index) // past elements
+				{
+					item.alpha = 1.0;
+				}
+				else // undone elements
+				{
+					item.alpha = 0.25;
+				}
+			}
+		}
+		[Bindable]
+		public function get historyIndex():uint
+		{
+			return _historyIndex;
+		}
+
+
+
+		private function onCreationComplete():void
+		{
+			//historyList = CloudHistory.historyList;
+			historyIndex = CloudHistory.historyIndex;
+
+			CloudHistory.historyList.addEventListener(CollectionEvent.COLLECTION_CHANGE, onHistoryChange);
+
+			// Set the Right Click menu for this Dialog
+   			var rightClickMenu:RightClickMenu = new RightClickMenu(this.title);
+   			this.contextMenu = rightClickMenu.triCloudContextMenu;
+		}
+
+
+		private function onItemClickHistoryBtn(event:ItemClickEvent):void
+		{
+			if(event.item.name == "undo") // undo last action
+			{
+				CloudHistory.undo();
+			}
+			else // redo last action
+			{
+				CloudHistory.redo();
+			}
+
+			historyIndex = CloudHistory.historyIndex;
+		}
+
+
+		// added or removed elements in HistoryList
+		private function onHistoryChange(event:CollectionEvent):void
+		{
+			historyIndex = CloudHistory.historyList.length-1; // Trick to get index
+			actionList.verticalScrollPosition = actionList.maxVerticalScrollPosition;
+		}
+
+
+		private function onItemClickActionList(event:ListEvent):void
+		{
+			// todo: should not change index
+			//historyIndex = CloudHistory.historyIndex;
+		}
+
+		private function onClickOk():void
+		{
+			this.dispatchEvent(new Event("close"));
+		}
+
+   	]]>
+    </mx:Script>
+
+
+	<!-- HISTORY LIST -->
+	<mx:List id="actionList"
+		width="100%" height="100%"
+		alpha="0.5"
+	  	verticalScrollPolicy="auto"
+	  	mouseEnabled="false"
+
+		dataProvider="{CloudHistory.historyList}"
+		labelField="name"
+		iconField="icon"
+	  	selectedIndex="{historyIndex}"
+
+		itemClick="onItemClickActionList(event);"
+	/>
+
+
+	<!-- HISTORY CONTROLS -->
+	<mx:ControlBar width="100%" horizontalAlign="left" verticalAlign="middle"
+		paddingBottom="0" paddingLeft="30" paddingRight="30" paddingTop="0">
+
+		<mx:ButtonBar id="undoButtons"
+			paddingTop="0" paddingBottom="0"
+			buttonWidth="24" buttonHeight="24"
+			itemClick="onItemClickHistoryBtn(event)">
+			<mx:Array>
+				<mx:Object name="undo" icon="{Globals.g_assets.UndoIcon}" toolTip="Undo the last action"/>
+				<mx:Object name="redo" icon="{Globals.g_assets.RedoIcon}" toolTip="Redo the last action"/>
+			</mx:Array>
+		</mx:ButtonBar>
+
+		<mx:Spacer width="100%"/>
+
+		<mx:Button id="okButton" label="Ok" click="onClickOk()" styleName="OkButton" />
+	</mx:ControlBar>
+
+</mx:TitleWindow>

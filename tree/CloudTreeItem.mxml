@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:cloudControls="controls.*"
+	width="100%" height="100%"
+	horizontalScrollPolicy="off" verticalScrollPolicy="off"
+
+	borderStyle="none"
+	paddingTop="0" paddingLeft="0" paddingBottom="0" paddingRight="0"
+
+	creationComplete="onCreationComplete()"
+	dataChange="onDataChange(event)">
+
+
+	<mx:Script>
+	<![CDATA[
+		import mx.controls.Alert;
+		import mx.controls.Tree;
+		import mx.binding.utils.BindingUtils;
+
+		import core.Cloud;
+		import CloudEngine;
+
+
+
+		[Bindable]
+		private var xmlNode:XML; // XML Node for this item
+
+		[Bindable]
+		private var m_cloud:Cloud = null; // cloud associated with this item
+
+		[Bindable]
+		private var cloudIconBitmap:Bitmap = new Bitmap();
+
+
+
+		private function onCreationComplete():void
+		{
+			xmlNode = this.data as XML;
+		}
+
+
+		override protected function createChildren():void
+        {
+        	super.createChildren();
+        }
+
+
+
+		private function onDataChange(event:Event):void
+		{
+			xmlNode = this.data as XML;
+	
+			if(!xmlNode)
+				return;
+
+			if(xmlNode.localName() == "clouds") // Root
+			{
+				
+			}
+			else if(xmlNode.localName() == "cloud") // Cloud item
+			{
+				// Find associated cloud on canvas
+				m_cloud = CloudEngine.GetInstance().GetCanvasController().GetCanvas().FindCloud(xmlNode.@localID);
+				if(m_cloud && m_cloud.iconBitmap)
+				{
+					cloudIconBitmap.bitmapData = m_cloud.iconBitmap.bitmapData;
+					cloudIconBitmap.smoothing = true; // slower...
+				}
+			}
+			else
+			{
+				CloudAlert.show("Invalid data in Cloud Tree", 'Cloud Error');
+			}
+		}
+
+
+		// Clicked on the cloud button
+		private function onClickCloudBtn(event:MouseEvent):void
+		{
+			var curPos:Point = new Point(event.stageX, event.stageY);
+
+			// Notice the tree that the cloud button was cliked on this cloud tree item
+			this.dispatchEvent(new CloudTreeItemEvent('cloudClick', m_cloud, curPos));
+		}
+
+
+		// On Click cloud icon
+		private function onClickCloudIcon(event:MouseEvent):void
+		{
+		}
+
+		// Make rollover effects on cloudName and icon?
+
+	]]>
+    </mx:Script>
+
+
+	<mx:HBox width="100%" height="100%" 
+		verticalAlign="middle"
+		paddingTop="0" paddingLeft="2"
+		verticalScrollPolicy="off" horizontalScrollPolicy="off">
+
+		<mx:Image id="cloudIcon" source="{cloudIconBitmap}"
+			width="48" height="48" 
+			maxWidth="48" maxHeight="48"
+			click="onClickCloudIcon(event);" />
+
+		<mx:VBox verticalGap="0" 
+			verticalScrollPolicy="off" horizontalScrollPolicy="off">
+
+			<mx:Label id="cloudLabel" width="100%" 
+				text="{xmlNode.@name} ({xmlNode.@localID})" fontWeight="bold"
+				toolTip="Cloud Name, Double-click to change"/>
+			<mx:Label id="cloudType" width="100%" 
+				text="{xmlNode.@type}" fontStyle="italic" />
+
+		</mx:VBox>
+
+	</mx:HBox>
+
+
+	<cloudControls:CloudButton id="cloudBtn" width="40" height="40"
+		x="{this.width - cloudBtn.width/2 + 4}" y="6"
+		alpha="0.75"
+		click="onClickCloudBtn(event)"
+		/>
+
+</mx:Canvas>

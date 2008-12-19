@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:cloudControls="controls.*" xmlns:cloudDialogs="dialogs.*"
+	width="500" height="500"
+	maxWidth="500" maxHeight="500"
+	titleIcon="{Globals.g_assets.EmailIcon}"
+	title="New Email"
+	layout="vertical" 
+	horizontalScrollPolicy="off" verticalScrollPolicy="auto"
+	showCloseButton="true"
+
+	styleName="CloudDialog"
+	titleStyleName="CloudDialogTitle"
+
+	creationComplete="onCreationComplete()"
+	close="onClickCancel()">
+
+
+	<mx:Script>
+    <![CDATA[
+
+		import mx.rpc.remoting.RemoteObject;
+        import mx.rpc.events.*;
+        import mx.controls.Alert;
+        import mx.managers.CursorManager;
+		import mx.managers.PopUpManager;
+
+		import core.CanvasCloud;
+
+
+		[Bindable]
+		private var myEmailValid:Boolean = false;
+		[Bindable]
+		private var destEmailValid:Boolean = false;
+
+
+		// Static instance, singleton
+		public static const emailDialog:EmailDialog = new EmailDialog();
+
+		[Bindable]
+		private var canvas:CanvasCloud = null;
+
+		[Bindable]
+		private var userXML:XML = null;
+
+		// RoR RO
+        private var mailRemObj:RemoteObject = new RemoteObject();
+
+
+
+
+		private function onCreationComplete():void
+		{
+			// Set the Right Click menu for this Dialog
+   			var rightClickMenu:RightClickMenu = new RightClickMenu(this.title);
+   			this.contextMenu = rightClickMenu.triCloudContextMenu;
+
+			// Remote object events
+    		mailRemObj.destination = "MailService";
+    		mailRemObj.send.addEventListener("result", onResultSendMail);
+        	mailRemObj.addEventListener("fault", onFault);
+		}
+
+		public function Init(canvas:CanvasCloud):void
+		{
+			this.width = Math.min(maxWidth, this.parentApplication.width);
+    		this.height = Math.min(maxHeight, this.parentApplication.height);
+
+			myEmailValid = false;
+			destEmailValid = false;
+
+			// Image
+			if(!canvas)
+			{
+				CloudAlert.show('Error: Invalid Canvas','Export');
+				return;
+			}
+			this.canvas = canvas;
+
+			if(imagePreview)
+				imagePreview.init();
+
+			// Retreive current User for email
+			userXML = CloudEngine.GetInstance().GetSessionController().GetUser();
+
+			myEmail.text = userXML.@email;
+		}
+
+
+
+
+
+		private function onClickSend():void
+		{
+			// TODO: Validation
+			if(!myEmailValid || !destEmailValid)
+				return;
+
+			// Create new XML Mail
+			var mailXML:XML = new XML("<mail></mail>"); 
+
+			mailXML.@myEmail = myEmail.text;
+			mailXML.@destEmail = destEmail.text;
+			mailXML.@subject = subject.text;
+			mailXML.@body = body.text;
+
+			// TODO: Image attach
+
+			// Submit Mail XML to backEnd
+			mailRemObj.send(mailXML.toXMLString());
+
+			CursorManager.setBusyCursor();
+			this.enabled = false;
+		}
+
+
+		// Result on send Mail
+		private function onResultSendMail(event:ResultEvent):void 
+    	{
+    		this.enabled = true;
+    		CursorManager.removeBusyCursor();
+
+			onClickCancel(); // Close Dialog
+
+			CloudAlert.show("Your Email was sent to '" + destEmail.text + "'", 'Send Email');			
+    	}
+
+		// FAULT
+		private function onFault(event:FaultEvent):void 
+        {
+        	this.enabled = true;
+        	CursorManager.removeBusyCursor(); // Hide the busy cursor
+
+            CloudAlert.show(event.fault.faultString, 'Error Send Email');
+        }
+
+
+		private function onClickCancel():void
+		{
+			PopUpManager.removePopUp(emailDialog);
+		}
+
+	]]>
+    </mx:Script>
+
+
+	<mx:HBox verticalAlign="middle">
+		<!-- SOURCE IMAGE THUMB -->
+		<cloudDialogs:ImagePreview id="imagePreview" 
+			sourcePanel="{canvas}"
+			iconWidth="100" iconHeight="100"/>
+
+		<mx:Label text="This Image will be Attached to this email"/>
+	</mx:HBox>
+
+
+	<!-- SEND EMAIL -->
+	<mx:Form id="submitBug"
+		width="100%"
+		horizontalScrollPolicy="off" verticalScrollPolicy="off"
+		verticalGap="7"
+		paddingLeft="5" paddingTop="10" paddingBottom="5" paddingRight="5">
+
+		<mx:FormItem label="My Email Address:" width="100%" >
+			<mx:TextInput id="myEmail" width="75%"/>
+		</mx:FormItem>
+
+		<mx:FormItem label="Dest. Email Address:" width="100%" >
+			<mx:TextInput id="destEmail" width="75%" />
+		</mx:FormItem>
+
+		<mx:FormItem label="Subject:" width="100%" >
+			<mx:TextInput id="subject" width="75%" />
+		</mx:FormItem>
+
+		<mx:FormItem label="Body:" width="100%" >
+			<mx:TextArea id="body" width="90%" height="170" />
+		</mx:FormItem>
+
+	</mx:Form>
+
+
+	<mx:ControlBar>
+		<mx:Button id="sendButton" label="Send" click="onClickSend()" styleName="OkButton" />
+		<mx:Button id="cancelButton" label="Cancel" click="onClickCancel()" styleName="CancelButton" />		
+	</mx:ControlBar>
+
+	<mx:EmailValidator source="{myEmail}" property="text" 
+       trigger="{sendButton}" triggerEvent="click"
+       invalid="myEmailValid = false" valid="myEmailValid = true;"/>
+
+	<mx:EmailValidator source="{destEmail}" property="text" 
+       trigger="{sendButton}" triggerEvent="click"
+       invalid="destEmailValid = false" valid="destEmailValid = true"/>
+
+</mx:TitleWindow>

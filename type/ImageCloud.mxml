@@ -1,0 +1,252 @@
+<?xml version="1.0" encoding="utf-8"?>
+<core:Cloud xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:core="core.*" xmlns:cloudType="type.*" xmlns:cloudTypeImage="type.image.*"
+	creationComplete="onCreationComplete()">
+
+
+	<mx:Script>
+    <![CDATA[
+		import mx.controls.Alert;
+
+		import core.CanvasCloud;
+		import type.image.ImageStyle;
+
+
+		[Bindable]
+    	private var bitmap:Bitmap = null;
+
+		[Bindable]
+		public var imageStyle:ImageStyle = new ImageStyle();
+
+
+
+		private function onCreationComplete():void
+		{
+			// we have to create a dummy Bitmap for drawCloud to have a fixed size and to be drawn to
+			if(!bitmap) // If Bitmap is null, if its not null, it has been duplicated or imported
+			{
+				var newBitmapData:BitmapData = new BitmapData(this.width, this.height, true, 0);
+				bitmap = new Bitmap(newBitmapData, "auto", true);
+			}
+		}
+
+
+		// BITMAP DATA accessors
+		public override function GetBitmapData():BitmapData
+		{
+			if(imageTag && imageTag.content)
+			{
+				return (Bitmap)(imageTag.content).bitmapData;
+			}
+			else
+			{
+				trace('invalid imageTag');
+				return null;
+			}
+		}
+		public override function SetBitmapData(bmpData:BitmapData):void
+		{
+			if(!bmpData)
+				return;
+
+			this.width = bmpData.width;
+			this.height = bmpData.height;
+			this.bitmap = new Bitmap(bmpData, "auto", true);
+		}
+
+
+		// Clone imageCloud
+		public override function clone():Cloud
+		{
+			var imageCloud:ImageCloud = super.clone() as ImageCloud;
+			if(imageCloud && this.bitmap)
+			{
+				imageCloud.SetBitmapData(this.bitmap.bitmapData);
+
+				// TODO: transforms, filters, etc
+			}
+
+			// Image Style
+			imageCloud.imageStyle = imageStyle.clone();
+
+			return imageCloud;
+		}
+
+		// Save imageCloud XML
+		public override function Save():XML
+		{
+			var cloudXML:XML = super.Save();
+			var imageCloudXML:XML = new XML("<imageCloud></imageCloud>"); // Create imageCloud XML
+
+			if(this.bitmap && CloudHistory.historySaveBinary)
+			{
+				var index:int = CloudHistory.saveBitmapData(this.bitmap.bitmapData); // Save bitmapData
+				imageCloudXML.@bitmapDataPath = index; // bitmapData path, -1 if nothing was saved
+			}
+
+			// TODO: transforms, filters, etc
+
+			var imageStyleXML:XML = imageStyle.Save(); // Create imageStyle XML
+			imageCloudXML.appendChild( imageStyleXML ); // Add imageStyle XML to ImageCloud XML
+
+			cloudXML.appendChild(imageCloudXML); // add imageCloud XML to coud XML
+			return cloudXML;
+		}
+
+		// Load imageCloud XML
+		public override function Load(cloudXML:XML):void
+		{
+			super.Load(cloudXML);
+			var imageCloudXML:XML = (cloudXML..imageCloud)[0];
+			if(imageCloudXML)
+			{
+				var index:int = imageCloudXML.@bitmapDataPath;
+				var bitmapData:BitmapData = CloudHistory.loadBitmapData(index);
+				if(bitmapData)
+				{
+					this.SetBitmapData(bitmapData);
+				}
+				else
+				{
+					trace('Load ImageCloud: Error loading binary data at path: ' + index);
+				}
+				// TODO: transforms, filters, etc
+			}
+		}
+
+
+
+		// hue, saturation, lightness.
+		// brightness, contrast
+
+
+		// Flip Image's content horizontal and vertical
+		public function FlipImage(horizontal:Boolean):void
+		{
+			var flipMat:Matrix = new Matrix();
+			flipMat.identity();
+
+			if(horizontal) // horizontal
+			{
+				flipMat.scale(Number((-this.scaleX).toFixed(2)), 
+							  Number((this.scaleY).toFixed(2)));
+				flipMat.translate(Number(bitmap.width.toFixed(0)), 0);
+			}
+			else // vertical
+			{
+				flipMat.scale(this.scaleX, -this.scaleY);
+				flipMat.translate(0, imageTag.height);
+			}
+
+			// Create new BitmapData, draw it using flip Matrix
+			var newBmpData:BitmapData = new BitmapData(Number(bitmap.width.toFixed(0)), 
+													   Number(bitmap.height.toFixed(0)), 
+													   true, 0);
+			newBmpData.draw(GetBitmapData(), flipMat);
+			SetBitmapData(newBmpData);
+
+			UpdateIconBitmap(); // Update icon
+		}
+
+
+		// Rotate Image clockwise and counterClockwise
+		public function RotateImage90(clockWise:Boolean):void
+		{
+			var rotateMat:Matrix = new Matrix();
+			rotateMat.identity();
+
+			if(clockWise) // rotate 90deg clockWise
+			{
+				rotateMat.rotate(Math.PI/2);
+				// center image
+				rotateMat.translate(imageTag.width, 0);
+				rotateMat.translate(imageTag.height - imageTag.width, 0); // ?
+			}
+			else // rotate 90deg counter clockWise
+			{
+				rotateMat.rotate(-Math.PI/2);
+				// center image
+				rotateMat.translate(0, imageTag.height);
+				rotateMat.translate(0, imageTag.width - imageTag.height); // ?
+			}
+
+			var newDim:Point = new Point(bitmap.height, bitmap.width); // Swap width and height
+
+			// Re Center the Cloud
+			this.x += this.width/2 - this.height/2;
+			this.y += this.height/2 - this.width/2;
+
+			// Create new BitmapData, draw it using rotation Matrix
+			var newBmpData:BitmapData = new BitmapData(Math.abs(newDim.x), Math.abs(newDim.y), true, 0);
+			newBmpData.draw(GetBitmapData(), rotateMat);
+			SetBitmapData(newBmpData);
+
+			this.invalidateDisplayList();
+
+			UpdateIconBitmap(); // Update icon
+
+			if(imageStyle.resizeCanvas) // Resize Canvas
+			{
+				var canvas:CanvasCloud = CanvasCloud(this.parent);
+				if(!canvas)
+					return;
+
+				canvas.ResizeCanvasToCloudBound();
+			}
+		
+		}
+
+
+		// Adjust Brightness
+		public function AdjustBrightness(b:Number):void
+		{
+            var matrix:Array = [b, b, b,
+                                b, 0, b,
+                                b, b, b];
+
+            var matrixX:Number = 3;
+            var matrixY:Number = 3;
+            var divisor:Number = 9;
+            var filter:BitmapFilter = new ConvolutionFilter(matrixX, matrixY, matrix, divisor);
+            var filters:Array = new Array();
+            filters.push(filter);
+            imageTag.content.filters = filters; // use filters in imageTag instead
+		}
+
+
+		// Adjust Contrast
+		public function AdjustContrast(b:int):void
+		{
+			var matrix:Array = [b, b, b,
+                                b, 0, b,
+                                b, b, b];
+
+            var matrixX:Number = 3;
+            var matrixY:Number = 3;
+            var divisor:Number = 70;
+            var filter:BitmapFilter = new ConvolutionFilter(matrixX, matrixY, matrix, divisor);
+            var filters:Array = new Array();
+            filters.push(filter);
+            imageTag.content.filters = filters; // use filters in imageTag instead
+		}
+
+
+		public function AdjustSharpness(s:uint):void
+		{
+
+		
+		}
+
+		public function AdjustHue(h:uint):void
+		{
+			
+		
+		}
+
+
+	]]>
+    </mx:Script>
+
+	<cloudTypeImage:ImageTag id="imageTag" source="{bitmap}" width="100%" height="100%"
+		cacheAsBitmap="true" cachePolicy="on"/>
+
+</core:Cloud>

@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml" 
+
+	verticalAlign="middle">
+
+
+	<mx:Script>
+    <![CDATA[
+
+		import controls.fontClasses.CloudFont;
+
+
+		[Bindable]
+		private var cloudFont:CloudFont = null;
+
+		[Bindable]
+		private var fontXML:XML = null;
+
+
+		// Init
+		public function init(cloudFont:CloudFont):void
+		{
+			this.cloudFont = cloudFont;
+
+			fontXML = this.cloudFont.Save();			
+		}
+
+
+		// Create Font Bitmap Icon
+		public function CreateIconBitmap():void
+		{
+			var bmpData:BitmapData = new BitmapData(fontSample.width, fontSample.height, true, 0);
+			bmpData.draw(fontSample);
+
+			cloudFont.iconBitmap = new Bitmap(bmpData, "auto", false);
+		}
+
+
+	]]>
+    </mx:Script>
+
+	<mx:Box borderStyle="solid">
+		<mx:Label id="fontSample"
+			toolTip="{cloudFont.name}"
+			fontFamily="{cloudFont.name}"
+			text="{cloudFont.name}"
+			fontSize="24" />
+	</mx:Box>
+
+</mx:VBox>

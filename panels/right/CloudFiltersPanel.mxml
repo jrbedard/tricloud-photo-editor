@@ -1,0 +1,401 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:rightPanels="panels.right.*" 
+	xmlns:cloudControls="controls.*"
+	verticalScrollPolicy="auto"
+
+	paddingTop="5" paddingLeft="0" paddingRight="0" paddingBottom="5"
+
+	creationComplete="onCreationComplete()">
+
+
+	<mx:Script>
+	<![CDATA[
+
+		import mx.core.Container;
+		import mx.containers.Panel;
+		import mx.controls.CheckBox;
+
+		import core.Cloud;
+		import events.*;
+
+
+		[Bindable]
+		private var m_cloud:Cloud = null;
+
+
+
+		private function onCreationComplete():void
+		{
+			
+		}
+
+
+		// Changed the selected cloud in the cloud tree or canvas
+		public function SetCloud(sCloud:Cloud):void
+		{
+			m_cloud = sCloud;
+
+			InitAccHeader("Drop Shadow");
+			InitAccHeader("Glow");
+			InitAccHeader("Bevel");
+			InitAccHeader("Blur");
+			InitAccHeader("Outline");
+			InitAccHeader("Noise");
+		}
+
+
+		// Called each time the Cloud change, set the filter enable
+		private function InitAccHeader(filterName:String):void
+		{
+			var filterIndex:int = filterAcc.getChildIndex(filterAcc.getChildByName(filterName)); // retreive position of the filter
+			var cloudFilterHeader:CloudFilterHeader = filterAcc.getHeaderAt(filterIndex) as CloudFilterHeader;
+			if(cloudFilterHeader)
+			{
+				cloudFilterHeader.remoteSelect = true;
+				cloudFilterHeader.selected = m_cloud.cloudFilters.IsFilterEnabled(filterName);
+			}
+		}
+
+
+		// Called by the accordion headers when a filter checkbox is check or uncheck
+		public function EnableFilter(filterName:String, checked:Boolean):void
+		{
+			var filterPanel:Container = filterAcc.getChildByName(filterName) as Container;
+			if(filterPanel)
+			{
+				filterPanel.enabled = checked; // enable or disable the associated filter panel in the accordion
+			}
+
+			m_cloud.cloudFilters.EnableFilter(filterName, checked); // add or remove the filter from the cloud's filter array
+
+			m_cloud.onCloudFiltersChanged(); // remove those
+		}
+
+
+		private function GetIndex(items:Array, itemName:String):int
+		{
+			var index:uint = 0;
+			for each(var item:Object in items)
+			{
+				if(itemName == item.name)
+					return index;
+
+				index++;
+			}
+			return 0;
+		}
+
+
+	]]>
+	</mx:Script>
+
+
+
+
+
+	<mx:Accordion id="filterAcc" width="100%" height="100%"
+		creationPolicy="auto" historyManagementEnabled="false"
+		resizeToContent="true" 
+		headerRenderer="panels.right.CloudFilterHeader"
+		selectedIndex="{filterAcc.numChildren-1}"
+
+		borderStyle="solid" borderSides="top" borderColor="0xc0c0ee" borderThickness="1" cornerRadius="0" 
+		paddingLeft="2" paddingRight="2">
+
+
+		<!-- DROP SHADOW FILTER -->
+		<mx:Form id="dropShadowBox" name="Drop Shadow" label="Drop Shadow" 
+			enabled="false"
+			width="100%"
+			styleName="FilterForm">
+
+			<!-- DROP SHADOW COLOR & OPACITY -->
+			<mx:FormItem label="Color:">
+				<cloudControls:ColorControl id="dropShadowColor"
+					width="32" height="32"
+					title="Drop Shadow"
+				 	toolTip="Select the Drop Shadow Color"
+				 	gradientEnabled="false"
+				 	selectedColor="{m_cloud.cloudFilters.dropShadowFilter.color}"
+				 	selectedAlpha="{m_cloud.cloudFilters.dropShadowFilter.alpha}"
+				 	change="m_cloud.cloudFilters.dropShadowFilter.color = dropShadowColor.selectedColor;
+				 			m_cloud.cloudFilters.dropShadowFilter.alpha = dropShadowColor.selectedAlpha;
+				 			m_cloud.onCloudFiltersChanged();"
+				 	/>
+			</mx:FormItem>
+
+
+			<!-- DROP SHADOW DISTANCE -->
+			<mx:FormItem label="Distance:">
+				<cloudControls:DistanceControl id="dropShadowDistance"
+					toolTip="Select Drop Shadow Distance"
+					value="{m_cloud.cloudFilters.dropShadowFilter.distance}"
+					change="m_cloud.cloudFilters.dropShadowFilter.distance = event.value;
+							m_cloud.onCloudFiltersChanged();"/>
+			</mx:FormItem>
+
+
+			<!-- DROP SHADOW ANGLE -->
+			<mx:FormItem label="Direction:">
+				<cloudControls:AngleControl id="dropShadowAngle"
+					toolTip="Select Drop Shadow Direction"
+					selectedColor="{dropShadowColor.selectedColor}"
+					value="{m_cloud.cloudFilters.dropShadowFilter.angle}"
+					change="m_cloud.cloudFilters.dropShadowFilter.angle = dropShadowAngle.value;
+							m_cloud.onCloudFiltersChanged();"/>
+			</mx:FormItem>
+
+
+			<mx:VBox styleName="FilterFormCheckBox">
+
+				<!-- DROP SHADOW INNER -->
+				<mx:CheckBox id="dropShadowInner" label="Inner"
+					toolTip="Make the shadow as an inner shadow"
+			 		selected="{m_cloud.cloudFilters.dropShadowFilter.inner}"
+			 		change="m_cloud.cloudFilters.dropShadowFilter.inner = dropShadowInner.selected;
+							m_cloud.onCloudFiltersChanged();"/>
+
+				<!-- DROP SHADOW KNOCKOUT -->
+				<mx:CheckBox id="dropShadowKnockout" label="Knockout"
+					toolTip="Make the object's fill transparent"
+			 		selected="{m_cloud.cloudFilters.dropShadowFilter.knockout}"
+			 		change="m_cloud.cloudFilters.dropShadowFilter.knockout = dropShadowKnockout.selected;
+							m_cloud.onCloudFiltersChanged();"/>
+
+				<!-- DROP SHADOW HIDDEN -->
+				<mx:CheckBox id="dropShadowHideObject" label="Hide Object"
+					toolTip="Hide the shadow projecting object"
+			 		selected="{m_cloud.cloudFilters.dropShadowFilter.hideObject}"
+			 		change="m_cloud.cloudFilters.dropShadowFilter.hideObject = dropShadowHideObject.selected;
+							m_cloud.onCloudFiltersChanged();"/>
+			 </mx:VBox>
+
+		</mx:Form>
+
+
+		<!-- GLOW FILTER -->
+		<mx:Form id="glowFilterBox" name="Glow" label="Glow"
+			enabled="false"
+			width="100%"
+			styleName="FilterForm">
+
+			<!-- GLOW COLOR & OPACITY -->
+			<mx:FormItem label="Color:">
+				<cloudControls:ColorControl id="glowColor"
+					width="32" height="32"
+					title="Glow"
+				 	toolTip="Select the Glow Color"
+				 	gradientEnabled="false"
+				 	selectedColor="{m_cloud.cloudFilters.glowFilter.color}"
+				 	selectedAlpha="{m_cloud.cloudFilters.glowFilter.alpha}"
+				 	change="m_cloud.cloudFilters.glowFilter.color = glowColor.selectedColor;
+				 			m_cloud.cloudFilters.glowFilter.alpha = glowColor.selectedAlpha;
+				 			m_cloud.onCloudFiltersChanged();"
+				 	/>
+			</mx:FormItem>
+
+			<!-- GLOW STRENGTH -->
+			<mx:FormItem label="Strength:">
+				<cloudControls:DistanceControl id="glowStrength"
+					minimum="0" maximum="20" tickInterval="2"
+					labels="['0','10','20']"
+					toolTip="Select Glow Strength"
+					value="{m_cloud.cloudFilters.glowFilter.strength}"
+					change="m_cloud.cloudFilters.glowFilter.strength = event.value;
+							m_cloud.onCloudFiltersChanged();"/>
+			</mx:FormItem>
+
+
+			<mx:VBox styleName="FilterFormCheckBox">
+
+				<!-- GLOW INNER -->
+				<mx:CheckBox id="glowInner" label="Inner"
+					toolTip="Make the glow as an inner glow"
+			 		selected="{m_cloud.cloudFilters.glowFilter.inner}"
+			 		change="m_cloud.cloudFilters.glowFilter.inner = glowInner.selected;
+							m_cloud.onCloudFiltersChanged();"/>
+
+				<!-- GLOW KNOCKOUT -->
+				<mx:CheckBox id="glowKnockout" label="Knockout"
+					toolTip="Make the object's fill transparent"
+			 		selected="{m_cloud.cloudFilters.glowFilter.knockout}"
+			 		change="m_cloud.cloudFilters.glowFilter.knockout = glowKnockout.selected;
+							m_cloud.onCloudFiltersChanged();"/>
+			</mx:VBox>
+
+		</mx:Form>
+
+
+		<!-- BEVEL FILTER -->
+		<mx:Form id="bevelFilterBox" name="Bevel" label="Bevel"
+			enabled="false"
+			width="100%"
+			styleName="FilterForm">
+
+
+			<!-- BEVEL TYPE -->
+			<mx:FormItem label="Type:">
+				<mx:ComboBox id="bevelType" 
+					selectedIndex="{GetIndex(bevelTypes, m_cloud.cloudFilters.bevelFilter.type)}"
+					change="m_cloud.cloudFilters.bevelFilter.type = bevelType.selectedItem.name;
+						    m_cloud.onCloudFiltersChanged();">
+					<mx:Array id="bevelTypes">
+						<mx:Object name="{BitmapFilterType.INNER}" label="{BitmapFilterType.INNER}" toolTip="Inner Bevel" />
+						<mx:Object name="{BitmapFilterType.OUTER}" label="{BitmapFilterType.OUTER}" toolTip="Outer Bevel" />
+						<mx:Object name="{BitmapFilterType.FULL}" label="{BitmapFilterType.FULL}" toolTip="Full Bevel" />
+					</mx:Array>
+				</mx:ComboBox>
+			</mx:FormItem>
+
+
+			<!-- BEVEL DISTANCE -->
+			<mx:FormItem label="Distance:">
+				<cloudControls:DistanceControl id="bevelDistance"
+					toolTip="Set the Bevel Distance"
+					value="{m_cloud.cloudFilters.bevelFilter.distance}"
+					change="m_cloud.cloudFilters.bevelFilter.distance = event.value;
+							m_cloud.onCloudFiltersChanged();"/>
+			</mx:FormItem>
+
+			<!-- BEVEL ANGLE -->
+			<mx:FormItem label="Direction:">
+				<cloudControls:AngleControl id="bevelAngle"
+					toolTip="Set the Bevel Angle"
+					value="{m_cloud.cloudFilters.bevelFilter.angle}"
+					change="m_cloud.cloudFilters.bevelFilter.angle = bevelAngle.value;
+							m_cloud.onCloudFiltersChanged();"/>
+			</mx:FormItem>
+
+			<!-- BEVEL HIGHLIGHTCOLOR -->
+			<mx:FormItem label="Highlight:">
+				<cloudControls:ColorControl id="bevelHighlightColor"
+					width="32" height="32"
+					title="Bevel Hightlight"
+				 	toolTip="Select the Bevel Highlight Color"
+				 	gradientEnabled="false"
+				 	selectedColor="{m_cloud.cloudFilters.bevelFilter.highlightColor}"
+				 	selectedAlpha="{m_cloud.cloudFilters.bevelFilter.highlightAlpha}"
+				 	change="m_cloud.cloudFilters.bevelFilter.highlightColor = bevelHighlightColor.selectedColor;
+				 			m_cloud.cloudFilters.bevelFilter.highlightAlpha = bevelHighlightColor.selectedAlpha;
+				 			m_cloud.onCloudFiltersChanged();"
+				 	/>
+			</mx:FormItem>
+
+			<!-- BEVEL SHADOWCOLOR -->
+			<mx:FormItem label="Shadow:">
+				<cloudControls:ColorControl id="bevelShadowColor"
+					width="32" height="32"
+					title="Bevel Shadow"
+				 	toolTip="Select the Bevel Shadow Color"
+				 	gradientEnabled="false"
+				 	selectedColor="{m_cloud.cloudFilters.bevelFilter.shadowColor}"
+				 	selectedAlpha="{m_cloud.cloudFilters.bevelFilter.shadowAlpha}"
+				 	change="m_cloud.cloudFilters.bevelFilter.shadowColor = bevelShadowColor.selectedColor;
+				 			m_cloud.cloudFilters.bevelFilter.shadowAlpha = bevelShadowColor.selectedAlpha;
+				 			m_cloud.onCloudFiltersChanged();"
+				 	/>
+			</mx:FormItem>
+
+			<mx:VBox styleName="FilterFormCheckBox">
+
+				<!-- BEVEL KNOCKOUT -->
+				<mx:CheckBox id="bevelKnockout" label="Knockout"
+					toolTip="Make the object's fill transparent."
+			 		selected="{m_cloud.cloudFilters.bevelFilter.knockout}"
+			 		change="m_cloud.cloudFilters.bevelFilter.knockout = bevelKnockout.selected;
+							m_cloud.onCloudFiltersChanged();"/>
+			</mx:VBox>
+
+		</mx:Form>
+
+
+		<!-- BLUR FILTER -->
+		<mx:Form id="blurFilterBox" name="Blur" label="Blur"
+			enabled="false"
+			width="100%"
+			styleName="FilterForm">
+
+			<!-- BLUR X -->
+			<mx:FormItem label="X:">
+				<mx:NumericStepper id="blurX" width="45" maxChars="2"
+					minimum="0" maximum="10"
+					toolTip="Set the Horizontal Blur"
+					value="{m_cloud.cloudFilters.blurFilter.blurX}" 
+					change="m_cloud.cloudFilters.blurFilter.blurX = blurX.value;
+							m_cloud.onCloudFiltersChanged();"/>
+			</mx:FormItem>
+
+			<!-- BLUR Y -->
+			<mx:FormItem label="Y:">
+				<mx:NumericStepper id="blurY" width="45" maxChars="2"
+					minimum="0" maximum="10"
+					toolTip="Set the Vertical Blur"
+					value="{m_cloud.cloudFilters.blurFilter.blurY}" 
+					change="m_cloud.cloudFilters.blurFilter.blurY = blurY.value;
+							m_cloud.onCloudFiltersChanged();"/>
+			</mx:FormItem>
+		</mx:Form>
+
+
+		<!-- OUTLINE FILTER -->
+		<mx:Form id="outlineFilterBox" name="Outline" label="Outline"
+			enabled="false"
+			width="100%"
+			styleName="FilterForm">
+
+			<!-- OUTLINE COLOR & OPACITY -->
+			<mx:FormItem label="Color:">
+				<cloudControls:ColorControl id="outlineColor"
+					width="32" height="32"
+					title="Outline"
+				 	toolTip="Select the Outline Color"
+				 	gradientEnabled="false"
+				 	selectedColor="{m_cloud.cloudFilters.outlineFilter.color}"
+				 	selectedAlpha="{m_cloud.cloudFilters.outlineFilter.alpha}"
+				 	change="m_cloud.cloudFilters.outlineFilter.color = outlineColor.selectedColor;
+				 			m_cloud.cloudFilters.outlineFilter.alpha = outlineColor.selectedAlpha;
+				 			m_cloud.onCloudFiltersChanged();"
+				 	/>
+			</mx:FormItem>
+
+
+		</mx:Form>
+
+
+		<!-- NOISE FILTER -->
+		<mx:Form id="noiseFilterBox" name="Noise" label="Noise"
+			enabled="false"
+			width="100%"
+			styleName="FilterForm">
+
+			<!--mx:LinkButton label="More in the library..." /-->
+		</mx:Form>
+
+
+	</mx:Accordion>
+
+
+	<mx:Style>
+	
+		.FilterForm
+		{
+			background-color: #FFFFFF; background-alpha: 1.0;
+			horizontalAlign: left; verticalAlign: middle;
+			horizontalGap:5; verticalGap:5;
+			paddingTop: 5; paddingLeft: 5; paddingRight: 5; paddingBottom: 5;
+		   	borderStyle: solid; borderColor: #C0C0EE; borderThickness: 1; borderSides: top,bottom; 
+		   	cornerRadius: 30;
+		   	indicatorGap: 10;
+  		}
+
+		.FilterFormCheckBox
+		{
+			verticalGap:0; horizontalAlign:left;
+			borderStyle:solid; cornerRadius:15;
+			paddingTop:3; paddingLeft:10; paddingRight:5; paddingBottom:3;
+		}
+
+	</mx:Style>
+
+
+</mx:VBox>

@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:cloudControls="controls.*"
+	horizontalScrollPolicy="off" verticalScrollPolicy="off"
+	currentState="{CloudType.ST_IMAGE}"
+
+ 	paddingLeft="4" paddingTop="4" paddingRight="4" paddingBottom="4"
+	borderStyle="none" borderColor="#000000" cornerRadius="15"
+    dropShadowEnabled="false" dropShadowColor="#000000" shadowDistance="2"
+
+    creationComplete="onCreationComplete()"
+    dataChange="onDataChange()"
+    rollOver="onRollOver(event)"
+    rollOut="onRollOut(event)"
+    click="onClick(event)"
+    mouseDown="onMouseDown(event)"
+    mouseMove="onMouseMove(event)"
+    mouseUp="onMouseUp(event)">
+
+
+	<mx:Script>
+	<![CDATA[
+		import mx.states.State;
+		import mx.controls.List;
+		import mx.controls.TileList;
+
+
+		[Bindable]
+		public var metaCloud:XML = null;
+
+
+
+		private function onCreationComplete():void
+		{
+			this.addEventListener("sortBy", onSortBy);
+		}
+
+		private function onDataChange():void
+		{
+			metaCloud = this.data as XML;
+
+			// Set states
+			if(metaCloud.@type == CloudType.ST_FONT)
+			{
+				//SetStateBasedOn(metaCloud.displayState, CloudType.ST_FONT);
+			}
+			else if(metaCloud.@type == CloudType.ST_BRUSH)
+			{
+				//SetStateBasedOn(metaCloud.displayState, CloudType.ST_BRUSH);
+			}
+
+			this.setCurrentState(metaCloud.@type); // current display state of the cloud proxy/thumb
+		}
+
+
+		private function SetStateBasedOn(stateName:String, basedOnState:String):void
+		{
+			for each(var state:State in this.states)
+			{
+				if(state.name == stateName)
+				{
+					state.basedOn = basedOnState;
+				}
+			}
+		}
+
+
+
+
+
+
+		private function onSortBy():void
+		{
+			//this.setCurrentState(metaCloud.displayState); // current display state of the cloud proxy/thumb
+		}
+
+
+		private function onRollOver(event:MouseEvent):void
+		{
+            //setStyle("borderStyle", "solid")
+            //menuButton.visible = true;
+            //setStyle("dropShadowEnabled", true);
+        }
+
+        private function onRollOut(event:MouseEvent):void
+		{
+            //setStyle("borderStyle", "none");
+            menuButton.visible = false;
+            //setStyle("dropShadowEnabled", false);
+        }
+
+		private function onClick(event:MouseEvent):void
+		{
+			 menuButton.visible = true;
+
+		}
+
+
+		private function onClickCloudBtn(event:MouseEvent):void
+		{
+			var curPos:Point = new Point(event.stageX, event.stageY);
+
+			// Notice the library list that the cloud button was cliked on this meta cloud item
+			this.dispatchEvent(new CloudLibraryListItemEvent('cloudButtonClick', metaCloud, curPos));
+		}
+
+
+
+	 	private var dragStartPoint:Point;
+
+        public function onMouseDown(event:MouseEvent):void
+        {
+        	/*
+            if (event.target != purchase &&
+                event.target != compare &&
+                event.target != details)
+            {
+                dragStartPoint = new Point(event.stageX, event.stageY);
+                dragStartPoint = globalToLocal(dragStartPoint);
+            }
+            */
+        }
+
+        public function onMouseMove(event:MouseEvent):void
+        {
+        	/*
+            if (dragStartPoint != null)
+            {
+                var dragEvent:DragEvent = new DragEvent(DragEvent.DRAG_START, true);
+                dragEvent.localX = dragStartPoint.x;
+                dragEvent.localY = dragStartPoint.y;
+                dragEvent.buttonDown = true;
+                dispatchEvent(dragEvent);
+
+                rollOutHandler(event);
+
+                dragStartPoint = null;
+            }
+            */
+        }
+
+        public function onMouseUp(event:MouseEvent):void
+        {
+            if (dragStartPoint != null)
+            {
+                dragStartPoint = null;
+            }
+        }
+
+ 
+	]]>
+    </mx:Script>
+
+
+    <mx:Label id="cloudNameLabel" x="5" y="5"
+    	text="{metaCloud.@name}" fontWeight="bold"/>
+
+	<mx:Image id="cloudIconImage" 
+		width="64" height="64" maintainAspectRatio="true" scaleContent="false"
+		x="5" y="{this.height/2 - cloudIconImage.height/2}"
+		source="{metaCloud.@iconPath}" />
+
+	<cloudControls:CloudButton id="menuButton" width="32" height="32" 
+		x="{this.width - menuButton.width/2}" y="{this.height/2 - menuButton.height/2}"
+		visible="false"
+		alpha="1.0"
+		click="onClickCloudBtn(event);"/>
+
+	<mx:Label id="cloudInfoLabel" x="5" y="{this.height - cloudInfoLabel.height - 5}" 
+		text="" color="#EE8D0C"/>
+
+
+
+	<mx:states>
+		<mx:State name="{CloudType.ST_IMAGE}">
+			<mx:SetProperty target="{cloudIconImage}" name="width" value="64" />
+			<mx:SetProperty target="{cloudIconImage}" name="height" value="64" />
+		</mx:State>
+
+		<mx:State name="{CloudType.ST_FONT}">
+			<mx:SetProperty target="{cloudIconImage}" name="width" value="128" />
+			<mx:SetProperty target="{cloudIconImage}" name="height" value="24" />
+		</mx:State>
+
+		<mx:State name="{CloudType.ST_BRUSH}">
+			<mx:SetProperty target="{cloudIconImage}" name="width" value="160" />
+			<mx:SetProperty target="{cloudIconImage}" name="height" value="32" />
+		</mx:State>
+
+		<mx:State name="{CloudType.ST_SHAPE}">
+		</mx:State>
+
+		<mx:State name="{CloudType.ST_GRADIENT}">
+		</mx:State>
+
+		<mx:State name="{CloudType.ST_EFFECT}">
+		</mx:State>
+
+
+		<!--mx:State name="name" basedOn="{CloudType.ST_IMAGE}">
+			<mx:SetProperty target="{cloudInfoLabel}" name="text" value="" />
+		</mx:State>
+
+		<mx:State name="price" basedOn="{CloudType.ST_IMAGE}">
+			<mx:SetProperty target="{cloudInfoLabel}" name="text" value="{metaCloud.@price}" />
+		</mx:State>
+
+		<mx:State name="rating" basedOn="{CloudType.ST_IMAGE}">
+			<mx:SetProperty target="{cloudInfoLabel}" name="text" value="" />
+			<mx:AddChild relativeTo="{cloudInfoLabel}">
+	    		<cloudControls:RatingControl id="cloudRating" rating="{metaCloud.@rating}"
+					editable="false" displayNotStar="false" />
+	        </mx:AddChild>
+		</mx:State>
+
+	    <mx:State name="useCount" basedOn="{CloudType.ST_IMAGE}">
+			<mx:SetProperty target="{cloudInfoLabel}" name="text" value="Used {metaCloud.@useCount} times" />
+		</mx:State>
+
+		<mx:State name="submitted" basedOn="{CloudType.ST_IMAGE}">
+			<mx:SetProperty target="{cloudInfoLabel}" name="text" value="{metaCloud.@created}" />
+		</mx:State-->
+	</mx:states>
+
+
+</mx:Canvas>

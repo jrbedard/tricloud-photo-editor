@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:cloudTree="tree.*" xmlns:panels="panels.*"
+	xmlns:cloudControls="controls.*"
+	borderStyle="none" verticalGap="0"
+	
+	creationComplete="onCreationComplete()">
+
+
+    <mx:Script>
+    <![CDATA[
+    	import mx.events.ItemClickEvent;
+    	import mx.controls.Image;
+		import mx.controls.Alert;
+		import mx.managers.PopUpManager;
+
+		import image.ImportDialog;
+		import image.ImageEvent;
+
+
+		// Image Importer Dialog
+		private var imageImportDialog:ImportDialog = ImportDialog.imageImportDialog;
+
+
+
+		private function onCreationComplete():void
+		{
+			imageImportDialog.addEventListener("importImage", onImportImageDialog); // detect closing and importing img
+			imageImportDialog.addEventListener("close", onCloseCancelImageDialog); // detect closing
+		}
+
+
+		public function init():void
+		{
+			cloudTree.init();
+		}
+
+
+		private function onItemClickTreeBtn(event:ItemClickEvent):void
+		{
+			if(!event.item)
+				return;
+
+			if(event.item.name == "duplicate")
+			{
+				cloudTree.DuplicateSelCloud(); // Duplicated selected cloud
+			}
+			else if(event.item.name == "merge")
+			{
+				cloudTree.MergeSelCloud(); // Merge selected cloud
+			}
+			else if(event.item.name == "delete")
+			{
+				cloudTree.DeleteSelCloud(); // Delete selected cloud
+			}
+			else if(event.item.name == "moveUp")
+			{
+				cloudTree.MoveSelCloud(true); // Move Up selected cloud
+			}
+			else if(event.item.name == "moveDown")
+			{
+				cloudTree.MoveSelCloud(false); // Move Down selected cloud
+			}
+		}
+
+
+
+
+		private function onClickNewImageCloud():void
+		{
+			CreateImageDialog(); // Create the Image Dialog
+		}
+
+		private function onClickNewTextCloud():void
+		{
+			cloudTree.NewCloud(CloudType.TEXT);
+		}
+
+		private function onClickNewDrawCloud():void
+		{
+			cloudTree.NewCloud(CloudType.DRAW);
+		}
+
+
+
+		private function CreateImageDialog():void
+		{
+			PopUpManager.addPopUp(imageImportDialog, this.parentApplication as DisplayObject, true); // more optimal?
+			imageImportDialog.Init();
+			PopUpManager.centerPopUp(imageImportDialog); // Center Image dialog	
+		}
+
+
+		private function onImportImageDialog(event:ImageEvent):void
+        {
+            PopUpManager.removePopUp(imageImportDialog); // Close image dialog
+
+            // Retreive image
+            if(event.m_bmp) // if bitmap was imported
+            {
+            	cloudTree.NewCloud(CloudType.IMAGE, event.m_cloudName, event.m_bmp.bitmapData, event.m_resizeCanvas);
+            }
+            else
+            {
+            	CloudAlert.show('There was a problem retreiving the image.', 'Cloud Error');
+            }
+        }
+
+
+		private function onCloseCancelImageDialog(event:Event):void
+		{
+			 PopUpManager.removePopUp(imageImportDialog); // Close image dialog
+		}
+
+    ]]>
+    </mx:Script>
+
+
+	<!-- CLOUD TREE -->
+	<cloudTree:CloudTree id="cloudTree" width="100%" height="100%" />	
+
+
+	<!-- CLOUD TREE BUTTON BAR -->
+	<mx:HBox width="100%" borderStyle="none"
+		horizontalAlign="left" horizontalGap="0"
+		paddingLeft="0" paddingRight="0">
+
+		<mx:LinkBar id="cloudTreeButtons"
+			horizontalGap="0" separatorWidth="2"
+			paddingTop="0" paddingBottom="0" paddingRight="0" paddingLeft="0"
+			borderStyle="solid"
+			itemClick="onItemClickTreeBtn(event)">
+			<mx:Array>
+				<mx:Object name="duplicate" icon="{Globals.g_assets.DuplicateCloudIcon}" toolTip="Duplicate the selected Cloud" />
+				<mx:Object name="merge" icon="{Globals.g_assets.MergeCloudIcon}" toolTip="Merge the selected Cloud with the on below"/>
+				<mx:Object name="delete" icon="{Globals.g_assets.DeleteCloudIcon}" toolTip="Delete the selected Cloud" />
+			</mx:Array>
+		</mx:LinkBar>
+
+		<mx:HBox width="100%" height="100%" 
+			backgroundColor="0xDDDDDD"
+			paddingRight="0"
+			borderStyle="solid" borderSides="bottom, top"/>
+
+		<mx:LinkBar id="cloudTreeMoveButtons"
+			horizontalGap="0" separatorWidth="2"
+			paddingTop="0" paddingBottom="0" paddingLeft="0"
+			borderStyle="solid"
+			itemClick="onItemClickTreeBtn(event)">
+			<mx:Array>
+				<mx:Object name="moveUp" icon="{Globals.g_assets.MoveUpCloudIcon}" toolTip="Move the selected Cloud Up"/>
+				<mx:Object name="moveDown" icon="{Globals.g_assets.MoveDownCloudIcon}" toolTip="Move the selected Cloud Down"/>
+			</mx:Array>
+		</mx:LinkBar>
+
+	</mx:HBox>
+
+
+
+	<!-- NEW CLOUD BUTTONS -->
+	<mx:HBox width="100%" height="18%" 
+		paddingTop="10"
+		horizontalGap="12" horizontalAlign="center"
+		verticalAlign="middle">
+
+		<cloudControls:CreateCloudButton id="newDrawCloudBtn" icon="{Globals.g_assets.NewDrawCloudIcon}" 
+			toolTip="Create a Draw Cloud"
+			click="onClickNewDrawCloud()"/>
+
+		<cloudControls:CreateCloudButton id="newImageCloudBtn" icon="{Globals.g_assets.NewImageCloudIcon}" 
+			toolTip="Create an Image Cloud"
+			click="onClickNewImageCloud()"/>
+
+		<cloudControls:CreateCloudButton id="newTextCloudBtn" icon="{Globals.g_assets.NewTextCloudIcon}" 
+			toolTip="Create a Text Cloud"
+			click="onClickNewTextCloud()"/>
+
+		
+	</mx:HBox>
+
+</mx:VBox>

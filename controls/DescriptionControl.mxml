@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml"
+	width="100%" height="100%"
+	currentState="view"
+
+	creationComplete="onCreationComplete()">
+
+
+	<mx:Script>
+    <![CDATA[
+
+		import mx.rpc.remoting.RemoteObject;
+        import mx.rpc.events.*;
+        import mx.controls.Alert;
+        import mx.managers.CursorManager;
+
+
+		// RoR RO
+        private var cloudRemObj:RemoteObject = new RemoteObject();
+
+
+		[Bindable]
+		public var cloudID:uint = 0;
+
+		[Bindable]
+		public var editable:Boolean = false;
+
+		[Bindable]
+		public var text:String = '';
+
+
+
+		private function onCreationComplete():void
+		{
+			// Remote object events
+			cloudRemObj.destination = "CloudService";
+        	cloudRemObj.addEventListener("fault", onFault);
+
+			cloudRemObj.updateDescription.addEventListener("result", onResultUpdateDescription);
+		}
+
+		public function Init(cloudID:uint):void
+		{
+			this.cloudID = cloudID;
+		}
+
+
+		// EDIT DESCRIPTION
+		private function onClickEditDescription():void
+		{
+			this.setCurrentState('edit');
+			cancelEdit.enabled = true;
+		}
+
+
+		// POST EDITED DESCRIPTION
+		private function onClickPostDescription():void
+		{
+			var newDescription:String = descriptionText.text; 
+
+			cloudRemObj.updateDescription(cloudID, newDescription); // Update description on back-end
+
+			cancelEdit.enabled = false; // disable cancel button
+		}
+
+		private function onResultUpdateDescription(event:ResultEvent):void 
+    	{
+    		CursorManager.removeBusyCursor();
+
+			this.text = descriptionText.text; // update text
+
+			Alert.show('Cloud Description updated successfully!', 'Cloud Description');
+
+    		this.setCurrentState('view');
+    	}
+
+
+		// FAULT
+		private function onFault(event:FaultEvent):void 
+        {
+            Alert.show(event.fault.faultString, 'Cloud Description Error');
+
+			CursorManager.removeBusyCursor(); // Hide the busy cursor
+        }
+
+
+
+		private function onClickCancelEdit():void
+		{
+			this.setCurrentState('view');
+
+			descriptionText.text = text; // revert text
+		}
+
+
+	]]>
+    </mx:Script>
+
+
+	<mx:TextArea id="descriptionText" 
+		width="100%" height="100%"
+		text="{text}"
+		editable="{editable}"/>
+
+
+	<mx:Button id="editDescription" label="Edit"
+		visible="true" includeInLayout="{editDescription.visible}"
+		click="onClickEditDescription()" />
+
+	<mx:HBox id="editBox"
+		visible="false" includeInLayout="{editBox.visible}">
+
+		<mx:Button id="postDescription" label="Post"	
+			click="onClickPostDescription()" />
+
+		<mx:Button id="cancelEdit" label="Cancel"
+			click="onClickCancelEdit()" />
+	</mx:HBox>
+	
+
+
+	<!-- DESCRIPTION CONTROL STATES -->
+	<mx:states>
+		<mx:State name="view">
+			
+		</mx:State>
+
+		<mx:State name="edit">
+			<mx:SetProperty target="{descriptionText}" name="editable" value="true" />
+			<mx:SetProperty target="{editDescription}" name="visible" value="false" />
+			<mx:SetProperty target="{editBox}" name="visible" value="true" />
+		</mx:State>
+	</mx:states>
+
+	
+</mx:VBox>

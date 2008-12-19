@@ -1,0 +1,514 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:cloudPanels="panels.*" xmlns:cloudControls="controls.*" xmlns:cloudDialogs="dialogs.*"
+	width="500" height="600"
+	maxWidth="500" maxHeight="600"
+	titleIcon="{Globals.g_assets.TriCloudIcon16}"
+	title="Submit {cloudType} to Cloud Library"
+	layout="vertical"
+	horizontalScrollPolicy="off" verticalScrollPolicy="off"
+	showCloseButton="true"
+
+	styleName="CloudDialog"
+	titleStyleName="CloudDialogTitle"
+
+	creationComplete="onCreationComplete()" xmlns:share="share.*">
+
+
+	<mx:Script>
+    <![CDATA[
+    	import mx.containers.Form;
+    	import mx.collections.ArrayCollection;
+        import mx.controls.Alert;
+		import mx.rpc.remoting.RemoteObject;
+        import mx.rpc.events.*;
+        import mx.managers.CursorManager;
+		import mx.managers.PopUpManager;
+
+		import com.adobe.images.PNGEnc;
+		import com.adobe.images.JPGEncoder;
+
+		import core.Cloud;
+    	import session.CloudSession;
+    	import type.DrawCloud;
+    	import type.ImageCloud;
+    	import type.TextCloud;
+   
+		import controls.colorClasses.CloudGradient;
+		import controls.fontClasses.CloudFont;
+		import controls.brushClasses.CloudBrush;
+		import controls.shapeClasses.CloudShape;
+		import controls.effectClasses.CloudEffect;
+
+
+
+		// Static instance, singleton
+		public static const shareCloudDialog:ShareCloudDialog = new ShareCloudDialog();
+
+
+		[Bindable]
+    	private var m_cloud:Cloud = null; // Cloud to submit
+
+		// CLOUD SUB TYPE
+		[Bindable]
+		public var cloudType:String = CloudType.ST_IMAGE;
+
+		[Bindable]
+		private var sharedCloud:SharedCloud = null;
+
+		// RoR RO
+        private var cloudRemObj:RemoteObject = new RemoteObject();
+
+		// Session
+		private var cloudSession:CloudSession = null;
+
+		private var cloudXML:XML = null;
+
+		private var userXML:XML = null;
+
+		// for cloud icon and image name
+		private var dataID:String = '';
+
+		// Valid Form
+		private var validForm:Boolean = true;
+
+
+
+		private function onCreationComplete():void
+    	{
+			// Set the Right Click menu for this Dialog
+   			var rightClickMenu:RightClickMenu = new RightClickMenu(this.title);
+   			this.contextMenu = rightClickMenu.triCloudContextMenu;
+
+   			// Remote object events
+			cloudRemObj.destination = "CloudService";
+        	cloudRemObj.submitMetaCloud.addEventListener("result", onResultSubmitMetaCloud);
+        	cloudRemObj.saveCloudData.addEventListener("result", onResultSaveCloudData);
+        	cloudRemObj.saveCloudIcon.addEventListener("result", onResultSaveCloudIcon);
+
+			cloudRemObj.addEventListener("fault", onFault);
+   		}
+
+
+
+		private function Validate():Boolean
+		{
+			// session
+			cloudSession = CloudEngine.GetInstance().GetSessionController().GetSession();
+
+			// Validate USER
+			if(!cloudSession.ValidateUser())
+				return false;
+
+			userXML = cloudSession.userXML;
+			userNameLink.label = userXML.@name; // Set User Link
+
+			if(cloudSession && cloudSession.canvas && cloudSession.canvas.parentApplication)
+			{
+				// Resize Window
+				this.width = Math.min(maxWidth, cloudSession.canvas.parentApplication.width);
+				this.height = Math.min(maxHeight, cloudSession.canvas.parentApplication.height);
+			}
+
+			return true;
+		}
+
+
+		// INIT Image cloud Share Dialog
+    	public function initCloud(sCloud:Cloud):void
+    	{
+    		if(!Validate())
+    			return;
+
+    		if(!sCloud)
+    		{
+    			CloudAlert.show("Invalid Cloud", "Cloud Submit Init");
+    			return;
+    		}
+
+    		m_cloud = sCloud;
+
+			imagePanel.init(m_cloud); // Initialize Image Panel
+
+			postInit();
+    	}
+
+
+		// INIT Shared Cloud Dialog (font, brush, shape, effect, gradient, etc)
+		public function initSharedCloud(sharedCloud:SharedCloud):void
+		{
+			if(!Validate())
+    			return;
+
+			this.sharedCloud = sharedCloud;
+
+			switch(cloudType)
+			{
+			case CloudType.ST_FONT:
+				fontPanel.init(CloudFont(sharedCloud));
+			break;
+
+			case CloudType.ST_BRUSH:
+				brushPanel.init(CloudBrush(sharedCloud));
+			break;
+
+			case CloudType.ST_SHAPE:
+				shapePanel.init(CloudShape(sharedCloud));
+			break;
+
+			case CloudType.ST_EFFECT:
+				effectPanel.init(CloudEffect(sharedCloud));
+			break;
+
+			case CloudType.ST_GRADIENT:
+				gradientPanel.init(CloudGradient(sharedCloud));
+			break;
+			}
+
+			// Name
+			cloudNameInput.text = sharedCloud.name;
+
+			postInit();
+		}
+
+
+		private function postInit():void
+		{
+			// Clear description
+			if(cloudDescription)
+				cloudDescription.text = "";
+
+			// Clear tags
+
+			if(progressBar)
+				progressBar.visible = false; // re-init progressBar
+
+    		// TODO splice cloud name to produce tags...
+		}
+
+
+
+
+
+		private function onChangeCloudName(event:TextEvent):void
+		{
+			if(m_cloud) // ?
+			{
+				m_cloud.name = cloudNameInput.text;
+			}
+			// TODO: update tags...
+		}
+
+	
+
+		private function onClickSubmit():void
+    	{
+    		if(!cloudSession || !userXML) // Valid session and registered User
+    			return;
+
+    		var userID:String = userXML.@id;
+
+    		CursorManager.setBusyCursor(); // Display the busy cursor
+ 
+    		progressBar.visible = true;
+    		progressBar.setProgress(10, 100);
+    		progressBar.label = "Saving XML for '" + cloudNameInput.text + "'";
+
+    		// TODO: validate name, description, tags, terms of use
+
+ 			// Create the XML cloud to submit
+ 			cloudXML = new XML("<metaCloud></metaCloud>"); // Create new XML Cloud
+
+ 			cloudXML.@type = cloudType + 'Cloud'; // Cloud Type
+ 			cloudXML.@userID = userID; // Author
+ 			cloudXML.@name = cloudNameInput.text; // Cloud Name
+ 			cloudXML.@attribute = 'Public';
+ 			cloudXML.@description = cloudDescription.text; // Cloud Description
+
+			// TODO tags
+ 			//cloudXML.@tags = tagControl.tags; // Tags, todo:child
+
+			// TODO: whats in panel
+
+			// SUBMIT CLOUD XML to the Back-End
+ 			cloudRemObj.submitMetaCloud(userID, cloudXML.toXMLString()); 			
+    	}
+
+
+    	private function onResultSubmitMetaCloud(event:ResultEvent):void 
+    	{
+    		dataID = event.result as String; // Retreive Cloud's index: TODO: encoded version...
+ 
+ 			SaveCloudIcon();
+ 
+ /*
+    		progressBar.setProgress(25, 100);
+			progressBar.label = "Cloud '" + m_cloud.name + "' Submitted!";
+			//CloudAlert.show("Cloud submission sucessful!"); // show something better!
+
+			progressBar.setProgress(25, 100);
+			progressBar.label = "Saving Draw data for Cloud '" + m_cloud.name + "'";
+
+
+			var drawCloud:DrawCloud = DrawCloud(m_cloud);
+			if(drawCloud)
+			{
+				cloudXML.appendChild( drawCloud.Save() ); // Save drawCloud/Cloud as XML
+
+				// draw image
+				var drawBmpData:BitmapData = drawCloud.GetBitmapData();
+				var drawPngBytes:ByteArray = PNGEnc.encode(drawBmpData);
+
+				cloudRemObj.saveCloudData('image', dataID, drawPngBytes); // Save draw BitmapData on the back-end
+			}
+*/
+    	}
+
+
+
+		// Remote object handlers
+		// ------------------------------
+
+		private function onResultSaveCloudData(event:ResultEvent):void 
+    	{
+    		progressBar.setProgress(50, 100);
+			progressBar.label = "Saved Data for Cloud '" + cloudNameInput.text + "'";
+
+
+    	}
+
+
+
+		private function SaveCloudIcon():void
+		{
+			var pngBytes:ByteArray = null;
+
+			progressBar.setProgress(75, 100);
+			progressBar.label = "Encoding Icon for Cloud '" + cloudNameInput.text + "'";
+
+			if(cloudType == CloudType.ST_IMAGE)
+			{
+				if(imagePanel && imagePanel.imagePreview && imagePanel.imagePreview.iconBitmap)
+				{
+					pngBytes = PNGEnc.encode(imagePanel.imagePreview.iconBitmap.bitmapData);
+				}
+			}
+			else
+			{
+				// CREATE ICON BITMAP
+				if(cloudType == CloudType.ST_FONT)
+				{
+					fontPanel.CreateIconBitmap();
+				}
+
+
+				if(sharedCloud && sharedCloud.iconBitmap)
+				{
+					pngBytes = PNGEnc.encode(sharedCloud.iconBitmap.bitmapData);
+				}
+			}
+
+			progressBar.setProgress(80, 100);
+			progressBar.label = "Submitting Icon for Cloud '" + cloudNameInput.text + "'";
+
+			// Save cloud icon
+			//cloudRemObj.saveCloudIcon(dataID, pngBytes); // buggy
+
+			UploadCloudImage(dataID, pngBytes);
+		}
+
+
+		// Upload Cloud Icon using file_upload_controller
+		private function UploadCloudImage(dataID:String, pngBytes:ByteArray):void
+		{
+			// URL Request
+			var request:URLRequest = new URLRequest(Globals.UPLOAD_CLOUD_ICON);
+		    request.method = URLRequestMethod.POST;
+
+			// URL Variables
+		    var variables:URLVariables = new URLVariables();
+			variables.content = pngBytes;
+			variables.filename = dataID;
+
+			// embbed data
+			request.data = variables;
+
+			navigateToURL(request, 'TriCloud');
+
+			FinishCloudSubmission();
+		}
+
+
+
+		private function onResultSaveCloudIcon(event:ResultEvent):void 
+    	{
+			var filePath:String = event.result as String;
+
+			FinishCloudSubmission();
+    	}
+
+
+		private function FinishCloudSubmission():void
+		{
+			progressBar.setProgress(100, 100);
+			progressBar.label = "Saved Icon for Cloud '" + cloudNameInput.text + "'";
+
+			CursorManager.removeBusyCursor(); // Remove the busy cursor
+
+			// Close Preview
+    		if(imagePanel.imagePreview)
+    		{
+    			imagePanel.imagePreview.Close();
+    		}
+    		this.dispatchEvent(new Event("close"));
+
+			// TODO: Go to cloud library?
+			 CloudAlert.show("Thank you for your submission.", 'Cloud submission sucesful!');
+		}
+
+
+
+
+		private function onFault(event:FaultEvent):void 
+        {
+            CloudAlert.show(event.fault.faultString, 'Cloud Submit Error');
+
+			CursorManager.removeBusyCursor(); // Remove the busy cursor
+        }
+
+
+
+		private function onClickCancel():void
+    	{
+    		// Close Preview
+    		//imagePreview.Close();
+    		this.dispatchEvent(new Event("close"));
+    	}
+
+
+		// handle closeButton_clickHandler ????
+
+
+
+	]]>
+    </mx:Script>
+
+
+	<mx:HBox horizontalGap="5" verticalAlign="middle">
+		<mx:Image source="{CloudType.Icon(cloudType)}" />
+		<mx:Label text="{cloudType}" fontWeight="bold" />
+	</mx:HBox>
+
+
+	<!-- CLOUD TYPE VIEWSTACK -->
+	<mx:ViewStack id="cloudTypeViewStack" width="100%" height="75"
+		borderStyle="solid"
+		creationPolicy="auto"
+		selectedIndex="{CloudType.GetIndex(cloudType)}">
+
+		<share:ImagePanel id="imagePanel" label="Image" name="image" />
+
+		<share:FontPanel id="fontPanel" label="Font" name="font" />
+
+		<share:BrushPanel id="brushPanel" label="Brush" name="brush" />
+
+		<share:ShapePanel id="shapePanel" label="Shape" name="shape" />
+
+		<share:EffectPanel id="effectPanel" label="Effect" name="effect" />
+
+		<share:GradientPanel id="gradientPanel" label="Gradient" name="gradient"/>
+
+	</mx:ViewStack> 
+
+
+	<mx:Spacer height="5%"/>
+
+
+	<!-- GENERAL CLOUD SUBMISSION FORM -->
+	<mx:Form width="100%"
+		verticalGap="10" horizontalGap="5"
+		indicatorGap="10"
+		paddingLeft="5" paddingTop="5" paddingRight="5" paddingBottom="5"
+		borderStyle="solid" borderColor="0xC0C0C0">
+
+		<mx:FormItem label="Submitter:" styleName="CloudFormItem">
+			<mx:LinkButton id="userNameLink" label="{userXML.@name}"
+				click="navigateToURL(new URLRequest('/portfolio/index/' + userXML.@id + '?view=private'), 'TriCloud');"/>
+		</mx:FormItem>
+
+		<mx:FormItem label="{cloudType} Name:" styleName="CloudFormItem">
+			<mx:TextInput id="cloudNameInput" text="{m_cloud.name}" fontWeight="bold" maxChars="64"
+				textInput="onChangeCloudName(event)"/>
+		</mx:FormItem>
+
+		<mx:FormItem label="Description:" styleName="CloudFormItem">
+			<mx:TextArea id="cloudDescription" width="300" height="100" />
+		</mx:FormItem>
+
+		<mx:FormItem label="Tag:" styleName="CloudFormItem">
+			<mx:VBox>
+				<mx:Label text="Enter a Tag that describes the cloud:" />
+				<cloudControls:TagControl id="tagControl" tags="{new XMLList(m_cloud.name)}" />
+			</mx:VBox>
+		</mx:FormItem>
+
+	</mx:Form>
+
+
+	<mx:Label text="This Cloud will be Public and can be downloaded by any registred TriCloud User" fontStyle="italic" />
+
+
+	<mx:HBox verticalAlign="middle" horizontalGap="0">
+		<mx:CheckBox id="agreeCheck" selected="false"
+			paddingRight="0" textAlign="left"/>
+
+		<mx:Label text="I agree to the" />
+
+		<mx:LinkButton id="termsOfUsage" label="Terms of Use"
+			click="navigateToURL(new URLRequest('/terms'), 'TriCloud');"/>
+
+		<mx:Label text="and" />
+
+		<mx:LinkButton id="copyright" label="Copyright"
+			click="navigateToURL(new URLRequest('/copyright'), 'TriCloud');"/>
+	</mx:HBox>
+
+
+
+	<mx:ProgressBar id="progressBar" width="100%" 
+		mode="manual"
+		label="" labelPlacement="top" 
+		enabled="true"
+		visible="false" includeInLayout="{progressBar.visible}"/>
+
+
+	<mx:ControlBar>
+		<mx:Button id="submitButton" label="Submit" click="onClickSubmit()" styleName="OkButton" />
+		<mx:Button id="cancelButton" label="Cancel" click="onClickCancel()" styleName="CancelButton" />		
+	</mx:ControlBar>
+
+
+	<!-- VALIDATORS -->
+	<mx:StringValidator id="cloudNameValidator" source="{cloudNameInput}" property="text"
+		required="true"
+		minLength="2" maxLength="64"
+		requiredFieldError="A cloud name is required."
+		tooShortError="The minimum length for a cloud name is 2." 
+        tooLongError="The maximum length for a cloud name is 64." 
+        trigger="{submitButton}" triggerEvent="click"
+        invalid="validForm = false;" valid="validForm = true;"/>
+
+	<mx:StringValidator id="descriptionValidator" source="{cloudDescription}" property="text" 
+		required="true"
+       	requiredFieldError="A Cloud Description is required."
+       	trigger="{submitButton}" triggerEvent="click"
+       	invalid="validForm = false;" valid="validForm = true;"/>
+
+	<mx:Validator id="termOfUseValidator" 
+		source="{agreeCheck}" property="selected"
+		required="true"
+		requiredFieldError="You must agree to the Terms of Use and Copyright/"
+		trigger="{submitButton}" triggerEvent="click"
+		invalid="validForm = false;" valid="validForm = true;"/>
+
+
+</mx:TitleWindow>

@@ -1,0 +1,587 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:core="cloud.core.*" xmlns:shape="cloud.shape.*"
+    implements="ICloudHistoryClient"
+    width="100" height="100"
+    doubleClickEnabled="true"
+    clipContent="true"
+    cacheAsBitmap="true"
+    cachePolicy="auto"
+    currentState="unSelected"
+    horizontalScrollPolicy="off" verticalScrollPolicy="off"
+
+	backgroundAlpha="0.0" backgroundColor="0xFFFFFF"
+	borderStyle="none"
+
+    creationComplete="onCreationComplete()"
+    rollOver="onRollOverCloud(event)"
+    rollOut="onRollOutCloud(event)"
+    click="onClickCloud(event)"
+    doubleClick="onDoubleClickCloud(event)">
+
+
+    <mx:Script>
+    <![CDATA[
+    	import mx.core.DragSource;
+		import mx.core.UIComponent;
+		import mx.core.FlexShape;
+    	import mx.controls.Image;
+        import mx.controls.Alert;
+   		import mx.controls.TextArea;
+   		import mx.containers.Panel;
+        import mx.managers.DragManager;
+		import mx.events.DragEvent;
+		import mx.events.ResizeEvent;
+		import mx.events.TweenEvent;
+		import mx.binding.utils.*;
+		import mx.utils.DisplayUtil;
+
+		import type.ImageCloud;
+		import type.DrawCloud;
+		import type.TextCloud;
+		import events.CloudEvent;
+		import CloudCursor;
+		import CloudEngine;
+
+
+		private static var factoryIndex:uint = 0;
+
+
+		public var localID:uint = 0; // Local cloud ID (Incremental Creation Index), dont clone as is
+
+		public var remoteID:String = "0"; // Remote cloud ID (ID from the library/DB)
+
+
+		// 'name' is in the Canvas Class, warning its not bindable
+
+		[Bindable]
+		public var type:String = CloudType.IMAGE; // ex: image, text, draw
+
+
+
+		[Bindable] // make this private
+		public var iconBitmap:Bitmap = new Bitmap(); // generated, no need to clone or save.
+
+
+		[Bindable]
+		public var cloudFilters:CloudFilters = new CloudFilters(); // Filters
+
+		[Bindable]
+		public var cloudModifiers:CloudModifiers = new CloudModifiers(); // Modifiers
+
+	
+
+		private var updateNb:int = 0;
+
+
+
+		public function get usWidth():Number
+		{
+			return this.unscaledWidth;
+		}
+		public function get usHeight():Number
+		{
+			return this.unscaledHeight;
+		}
+
+
+		// Init
+		private function onCreationComplete():void
+		{
+			//DragManager.acceptDragDrop(this); // accept drag and drop
+
+			UpdateCloud();
+
+			// Set the Right Click menu for this Dialog
+   			var rightClickMenu:RightClickMenu = new RightClickMenu(this.name);
+   			this.contextMenu = rightClickMenu.triCloudContextMenu;
+		}
+
+
+		public static function CloudFactory(cloudType:String):Cloud
+		{
+			var newCloud:Cloud = null;
+			if(cloudType == CloudType.IMAGE) // Image Cloud
+			{
+				newCloud = new ImageCloud();
+			}
+			else if(cloudType == CloudType.DRAW) // Draw Cloud
+			{
+				newCloud = new DrawCloud();
+			}
+			else if(cloudType == CloudType.TEXT) // Text Cloud
+			{
+				newCloud = new TextCloud();
+			}
+			else
+			{
+				CloudAlert.show('Cloud Factory: unknown cloud type : ' + cloudType, 'Cloud Error');
+				return null;
+			}
+
+			newCloud.localID = factoryIndex++; // ID
+			// TODO: doublecheck that no other clouds on canvas has that new ID
+
+			newCloud.name = "New Cloud " + factoryIndex;
+			newCloud.type = cloudType;
+
+			return newCloud;
+		}
+
+
+		// clone Cloud, also in derived class
+		public virtual function clone():Cloud
+		{
+			var dupCloud:Cloud = CloudFactory(this.type);
+			if(!dupCloud)
+				return null;
+
+			dupCloud.remoteID = this.remoteID;
+			// name and localID are set by the CloudFactory
+			dupCloud.type = this.type;
+
+			// transform
+			dupCloud.width = this.width;
+			dupCloud.height = this.height;
+			dupCloud.x = this.x;
+			dupCloud.y = this.y;
+			dupCloud.rotation = this.rotation;
+			dupCloud.scaleX = this.scaleX;
+			dupCloud.scaleY = this.scaleY;
+
+			dupCloud.visible = this.visible;
+			dupCloud.alpha = this.alpha;
+			dupCloud.blendMode = this.blendMode;
+
+			// filters
+			dupCloud.cloudFilters = cloudFilters.clone();
+
+			// modifiers
+			dupCloud.cloudModifiers = cloudModifiers.clone();
+
+			return dupCloud;
+		}
+
+
+		// Save Cloud XML
+		public virtual function Save():XML
+		{
+			var cloudXML:XML = new XML("<cloud></cloud>");
+
+			cloudXML.@localID = this.localID; // cloud local ID, useful?
+			cloudXML.@remoteID = this.remoteID; // cloud ID if from the Cloud Library
+			cloudXML.@name = this.name; // Cloud Name
+			cloudXML.@type = this.type; // Cloud Type (image, text, draw, etc)
+
+			// Save Cloud Transform
+			var transformXML:XML = new XML("<transform></transform>"); // Create Cloud Transform, WHY separte child?
+			transformXML.@width = this.width.toFixed(1);
+			transformXML.@height = this.height.toFixed(1);
+			transformXML.@x = this.x.toFixed(1);
+			transformXML.@y = this.y.toFixed(1);
+			transformXML.@rotation = this.rotation.toFixed(2);
+			transformXML.@scaleX = this.scaleX.toFixed(2);
+			transformXML.@scaleY = this.scaleY.toFixed(2);
+			cloudXML.appendChild(transformXML); // Add Cloud Transform XML to Cloud XML
+
+			// Save Cloud Properties
+			var propertyXML:XML = new XML("<property></property>"); // Create Cloud Property
+			propertyXML.@visible = this.visible;
+			propertyXML.@alpha = this.alpha.toFixed(2);
+			propertyXML.@blendMode = this.blendMode;
+			cloudXML.appendChild(propertyXML); // Add Cloud properties XML to Cloud XML
+
+			// Save Cloud Filters
+			cloudFilters.Save(cloudXML); // Add Cloud filters XML to Cloud XML
+
+			// Save Cloud Modifiers
+			cloudModifiers.Save(cloudXML);  // Add Cloud modifiers XML to Cloud XML
+
+			return cloudXML;
+		}
+
+
+		// Load Cloud XML
+		public virtual function Load(cloudXML:XML):void
+		{
+			if(!cloudXML)
+				return;
+
+			// Load Cloud General
+			//this.localID = cloudXML.@localID;
+			this.remoteID = cloudXML.@remoteID;
+			this.name = cloudXML.@name;
+			this.type = cloudXML.@type;
+
+			// Load Cloud Transform
+			var transformXML:XML = (cloudXML.transform)[0]; // Retreive Cloud Transform XML
+			if(transformXML) // 1
+			{
+				this.width = transformXML.@width;
+				this.height = transformXML.@height;
+				this.x = transformXML.@x;
+				this.y = transformXML.@y;
+				this.rotation = transformXML.@rotation;
+				this.scaleX = transformXML.@scaleX;
+				this.scaleY = transformXML.@scaleY;
+				//this.transform.matrix = transformXML.@transformMatrix;
+			}
+
+			// Load Cloud Properties
+			var propertyXML:XML = (cloudXML.property)[0]; // Retreive Cloud Property XML
+			if(propertyXML)
+			{
+				this.visible = propertyXML.@visible;
+				this.alpha = propertyXML.@alpha;
+				this.blendMode = propertyXML.@blendMode;
+			}
+
+			// Load Cloud Filters
+			cloudFilters.Load(cloudXML); // Load Cloud filters from Cloud XML
+
+			// Load Cloud Modifiers
+			cloudModifiers.Load(cloudXML);
+
+			// Select this Cloud
+			this.dispatchEvent(new CloudEvent("clickCloud", this));
+		}
+
+
+
+
+		public function onFocus():void
+		{
+			
+		}
+
+		public function onLoseFocus():void
+		{
+			
+		}
+
+
+
+		// Update Cloud Filters
+		public function onCloudFiltersChanged():void
+		{
+			this.filters = cloudFilters.filters.toArray();
+		}
+
+
+
+		// DisplayUtils.walkDisplayObjects...
+
+
+		// ADD
+        public function AddTag(tag:UIComponent):void
+        {
+			this.addChild(tag);
+
+			if(this.numChildren > 50)
+			{
+				CloudAlert.show("There are 50 tags in this cloud, slow down Billy!", 'Cloud Error');
+			}
+			UpdateCloud();
+        }
+
+
+		// FIND : Find a tag based on tag name
+        public function FindTag(tagName:String):UIComponent
+        {
+			var tag:UIComponent = this.getChildByName(tagName) as UIComponent;
+   			if(!tag)
+   			{
+   				CloudAlert.show("FindTag : Tag not found in cloud: '" + tagName + "'", 'Cloud Error');
+   			}
+   			return tag;
+        }
+
+
+		// SELECT : Highlight Tag in the tag Tree
+		public function SelectTag(tagName:String):void
+		{
+			var tag:UIComponent = FindTag(tagName);
+			if(tag)
+			{
+				// TRY to emulate mouse OVER..
+				//tag.dispatchEvent(new MouseEvent(MouseEvent.MOUSE_OVER));
+				//tag.setFocus();
+			}
+		}
+
+
+		// REMOVES
+        public function RemoveTag(tag:UIComponent):void
+        {
+           	if(this.contains(tag))
+           	{
+            	this.removeChild(tag);
+            }
+            else
+            {
+            	trace('error: cloud remove non-children tag');
+            }
+        }
+
+        public function RemoveTagByName(tagName:String):void
+        {
+        	var tag:UIComponent = FindTag(tagName);
+        	if(tag)
+        	{
+        		RemoveTag(tag);
+        	}
+        	else
+        	{
+        		CloudAlert.show("RemoveTagByName : Tag not found in tag cloud: '" + tagName + "'", 'Cloud Error');
+        	}
+        }
+
+		// REMOVES ALL
+		public function RemoveAllTags():void
+		{
+			this.removeAllChildren();
+		}
+
+
+
+		override protected function measure():void
+		{
+			super.measure();
+		}
+
+
+		public function UpdateCloud():void
+		{
+			updateNb = 0;
+			//this.invalidateDisplayList();
+			this.addEventListener("updateComplete", onUpdateComplete); // called when completely updated
+		}
+
+		// RENDERER
+        // ***********************************
+        override protected function updateDisplayList(unscaledWidth:Number, unscaledHeight:Number):void
+        {
+            super.updateDisplayList(unscaledWidth, unscaledHeight);
+        }
+
+
+		// When Dispatched when an object has had its commitProperties(), measure(), and updateDisplayList() methods called.
+		private function onUpdateComplete(event:Event):void
+		{
+			if(updateNb++ >= 2) // needs 2 update only.... CRAP optimization, TODO: find out why...
+			{
+				UpdateBoundingShape();
+				this.removeEventListener("updateComplete", onUpdateComplete);
+			}
+		}
+
+
+		// Compute bounding rectangle
+		public function UpdateBoundingShape():void
+		{
+			this.validateNow();
+
+			var tag:DisplayObject;
+			var tagBound:Rectangle = null; // tag bounding rectangle relative to the cloud
+			var rec:Rectangle = new Rectangle(0,0,0,0); // cloud's tag bouding rectangle
+			rec.left = int.MAX_VALUE;
+			rec.top = int.MAX_VALUE;
+			rec.right = 0;
+			rec.bottom = 0;
+
+			for each(tag in this.getChildren()) // For each child of this cloud
+			{
+			    tagBound = tag.getRect(this); // tag bounding rectangle within cloud
+			    // getRect() ignores the strokes and shapes compared to getBound()
+
+				if(tagBound.left < rec.left)
+					rec.left = (isNaN(tagBound.left)? rec.left : tagBound.left);
+
+				if(tagBound.top < rec.top)
+					rec.top = (isNaN(tagBound.top)? rec.top : tagBound.top);
+
+				if(tagBound.right > rec.right)
+					rec.right = (isNaN(tagBound.right)? rec.right : tagBound.right);
+
+				if(tagBound.bottom > rec.bottom)
+					rec.bottom = (isNaN(tagBound.bottom)? rec.bottom : tagBound.bottom);
+			}
+
+			// The bounding rectangle of all the children tags was computed...
+
+
+			// resize cloud according to its tags
+			//rec.width = Math.min(this.parent.width, rec.width); // A cloud can never be wider than the canvas
+			//rec.height = Math.min(this.parent.height, rec.height); // A cloud can never be taller than the canvas
+
+			if(this.type == CloudType.TEXT) // Text Cloud only for now
+			{
+				this.width = rec.width * this.scaleX;
+				this.height = rec.height * this.scaleY;
+			}
+
+			UpdateIconBitmap();
+
+		}
+
+
+		private function onResizingCloud(event:TweenEvent):void
+		{
+			
+		}
+
+
+		public function Transformed(transform:String):void
+		{
+			if(transform == 'translating')
+			{
+				CloudHistory.action("Cloud Translation", this, false);
+			}
+			else if(transform == 'rotating')
+			{
+				CloudHistory.action("Cloud Rotation", this, false);
+			}
+			else if(transform == 'scaling')
+			{
+				CloudHistory.action("Cloud Scaling", this, false);
+			}
+			else if(transform == 'cropping')
+			{
+				CloudHistory.action("Cloud Cropping", this, true); // save binary for cropping
+			}
+		}
+
+		
+
+
+		public function UpdateIconBitmap():void
+		{
+			const iconSize:int = 48;
+			var bmpData:BitmapData = new BitmapData(iconSize, iconSize, true, 0); // slower with alpha..
+			var mat:Matrix = Globals.GetIconMatrix(this, iconSize, iconSize);
+
+			// TODO:rotation around center
+			//mat.rotate(this.rotation); // rotation according to this cloud's rotation
+			// then translate it back
+
+			bmpData.draw(this, mat, null, null, null, true);
+
+	    	iconBitmap.bitmapData = bmpData;
+	    	iconBitmap.smoothing = true; // slower....
+		}
+
+
+		// Overriden by children
+		public virtual function GetBitmapData():BitmapData
+		{
+			CloudAlert.show("GetBitmapData(): shouldnt come here..", 'Cloud Error');
+			return new BitmapData(this.width, this.height);
+		}
+		public virtual function SetBitmapData(bmpData:BitmapData):void
+		{
+			CloudAlert.show("SetBitmapData(): shouldnt come here..", 'Cloud Error');
+		}
+
+
+
+		// MOUSE EVENTS
+        // *********************************** 
+        private function onRollOverCloud(mouseEvent:MouseEvent):void
+        {
+   			if(this.currentState == "unSelected") // IF, the controller is not translating, rotamet another cloud
+        	{
+        		this.setCurrentState("mouseOver");
+        	}
+        }
+
+        private function onRollOutCloud(mouseEvent:MouseEvent):void
+        {
+        	this.dispatchEvent(new CloudEvent("rollOutCloud", this));
+
+        	if(this.currentState == "mouseOver") // IF, the controller is not translating, rotamet another cloud
+        	{
+   				this.setCurrentState("unSelected");
+        	}
+        }
+
+		private function onClickCloud(mouseEvent:MouseEvent):void
+		{
+			this.dispatchEvent(new CloudEvent("clickCloud", this));
+
+			if(this.currentState == "mouseOver")
+			{
+				this.setCurrentState("selected");
+
+			}
+		}
+
+
+		private function onDoubleClickCloud(mouseEvent:MouseEvent):void
+		{
+			
+		}
+
+
+    ]]>
+    </mx:Script>
+
+
+
+	<!-- Cloud States, we can only add child in states or else it clashes with cloud-derived classes children -->
+	<mx:states>
+		<mx:State name="unSelected">
+			<!--mx:SetStyle target="{this}" name="backgroundAlpha" value="0.0" /-->
+			<mx:SetProperty target="{this}" name="mouseChildren" value="false" />
+		</mx:State>
+
+		<mx:State name="mouseOver">
+			<!--mx:SetStyle target="{this}" name="backgroundAlpha" value="1.0"/-->
+			<mx:SetProperty target="{this}" name="mouseChildren" value="false" />
+		</mx:State>
+
+		<mx:State name="selected">
+			<!--mx:SetStyle target="{this}" name="backgroundAlpha" value="0.5"/-->
+			<!--mx:SetStyle target="{this}" name="backgroundColor" value="#0000FF"/-->
+			<mx:SetProperty target="{this}" name="mouseChildren" value="true" />
+		</mx:State>
+
+		<mx:State name="translating" basedOn="selected">
+		</mx:State>
+
+		<mx:State name="rotating" basedOn="selected">
+		</mx:State>
+
+		<mx:State name="scaling" basedOn="selected">
+		</mx:State>
+
+		<mx:State name="cropping" basedOn="selected">
+		</mx:State>
+	</mx:states>
+
+
+	<!-- Cloud Transitions between states -->
+	<mx:transitions>
+		<mx:Transition fromState="unSelected" toState="mouseOver">
+			<!--mx:Fade target="{this.}" alphaFrom="0.0" alphaTo="1.0" duration="200" /-->
+		</mx:Transition>
+
+		<mx:Transition fromState="mouseOver" toState="unSelected">
+			<!--mx:Fade target="{boundShape}" alphaFrom="1.0" alphaTo="0.0" duration="200" /-->
+		</mx:Transition>
+
+		<mx:Transition fromState="mouseOver" toState="selected">
+		</mx:Transition>
+
+		<mx:Transition fromState="selected" toState="mouseOver">
+		</mx:Transition>
+
+		<mx:Transition fromState="unSelected" toState="selected">
+			<!--mx:Fade target="{boundShape}" alphaFrom="0.0" alphaTo="1.0" duration="200" /-->
+		</mx:Transition>
+
+		<mx:Transition fromState="selected" toState="unSelected">
+			<!--mx:Fade target="{boundShape}" alphaFrom="1.0" alphaTo="0.0" duration="200" /-->
+		</mx:Transition>
+	</mx:transitions>
+
+
+</mx:Canvas>

@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml" 
+	width="225" height="200"
+	layout="vertical"
+	titleIcon="{Globals.g_assets.NewImageCloudIcon}"
+	title="Create Image Effect"
+	horizontalScrollPolicy="off" verticalScrollPolicy="off"
+	showCloseButton="true"
+
+	styleName="CloudDialog"
+	titleStyleName="CloudDialogTitle"
+
+	creationComplete="onCreationComplete()"
+	close="onClickCancel()">
+
+
+	<mx:Script>
+	<![CDATA[
+
+		import mx.managers.PopUpManager;
+
+		// Static instance, singleton
+		public static var effectCreation:EffectCreation = new EffectCreation();
+
+		[Bindable]
+		private var effectBitmap:Bitmap = null;
+
+
+
+		private function onCreationComplete():void
+		{
+			
+		}
+
+
+		private function onClickOk():void
+		{
+			var effect:CloudEffect = new CloudEffect();
+			effect.name = effectNameInput.text;
+			effect.iconBitmap = effectBitmap;
+			this.dispatchEvent(new EffectEvent('newEffect', effect));
+
+			PopUpManager.removePopUp(effectCreation);
+		}
+
+		private function onClickCancel():void
+		{
+			PopUpManager.removePopUp(effectCreation);
+		}
+
+	]]>
+    </mx:Script>
+
+
+
+
+	<mx:VBox id="createdEffectBox" borderStyle="solid"
+		visible="false" includeInLayout="{createdEffectBox.visible}"
+		height="100">
+
+		<mx:Image id="effectImage" source="{effectBitmap}" />
+
+		<mx:Form>
+			<mx:FormItem label="Effect Name:">
+				<mx:TextInput id="effectNameInput" />
+			</mx:FormItem>
+		</mx:Form>
+
+	</mx:VBox>
+
+
+	<mx:ControlBar width="100%"
+		horizontalAlign="center">
+
+		<mx:Button id="okButton" label="Create" click="onClickCancel()" styleName="OkButton" />
+		<mx:Button id="cancelButton" label="Cancel" click="onClickCancel()" styleName="CancelButton" />
+
+	</mx:ControlBar>
+
+</mx:TitleWindow>

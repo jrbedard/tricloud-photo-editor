@@ -1,0 +1,542 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Panel xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:panels="panels.*" xmlns:library="library.*"
+	implements="ICloudHistoryClient"
+	horizontalScrollPolicy="off" verticalScrollPolicy="off"
+	layout="vertical"
+
+	styleName="CloudPanel"
+	cornerRadius="0"
+	paddingTop="20"
+
+	creationComplete="onCreationComplete()">
+
+
+ 	<mx:Script>
+    <![CDATA[
+
+    	import mx.validators.ValidationResult;
+    	import mx.controls.Image;
+		import mx.rpc.remoting.RemoteObject;
+        import mx.rpc.events.*;
+        import mx.collections.ArrayCollection;
+        import mx.controls.Alert;
+        import mx.collections.XMLListCollection;
+        import mx.events.CloseEvent;
+        import mx.managers.CursorManager;
+        import mx.managers.PopUpManager;
+
+		import core.Cloud;
+		import session.SessionController;
+		import session.CloudSession;
+		import dialogs.FlagDialog;
+		import events.CloudFlagEvent;
+
+
+
+		// Session		
+		private var sessionController:SessionController = null;
+
+		[Bindable]
+		private var cloudSession:CloudSession = null;
+
+
+
+		[Bindable]
+		public var metaCloudPanel:MetaCloudPanel = null;
+
+		// RoR RO
+        private var cloudRemObj:RemoteObject = new RemoteObject();
+
+
+		[Bindable]
+		private var selMetaCloud:XML = null; // Currently selected Cloud
+
+
+		private const cloudLoader:CloudLoader = new CloudLoader();
+
+		// Flag as innapropriate Dialog
+		private var flagDialog:FlagDialog = FlagDialog.flagDialog;
+
+
+
+
+		// put this else where?
+		private function onCreationComplete():void
+		{
+			// Browser events
+			this.addEventListener("search", onSearchLibrary); // search library
+			this.addEventListener("browse", onBrowseLibrary); // browse library
+
+			this.addEventListener("sortBy", onSortMetaClouds); // sort searched clouds
+			this.addEventListener("filter", onFilterMetaClouds); // filter clouds
+
+
+			// clicked cloud thumbnail
+			this.addEventListener("metaCloudClick", onClickMetaCloud);
+
+			// Clicked cloud thumbnail menu
+			this.addEventListener("viewCloud", onViewCloud);
+			this.addEventListener("downloadCloud", onDownloadCloud);
+			this.addEventListener("flagCloud", onFlagCloud);
+			this.addEventListener("commentCloud", onCommentCloud);
+			this.addEventListener('favoriteCloud', onAddFavoriteCloud);
+			//this.addEventListener('deleteCloud', onDeleteCloud);
+
+			// metaCloudPanel buttons
+			metaCloudPanel.addEventListener("viewCloud", onViewCloud);
+			metaCloudPanel.addEventListener('authorClick', onAuthorLinkClick);
+			metaCloudPanel.addEventListener('tagClick', onTagLinkClick);
+			metaCloudPanel.addEventListener('downloadCloud', onDownloadCloud);
+			metaCloudPanel.addEventListener('favoriteCloud', onAddFavoriteCloud);
+			metaCloudPanel.addEventListener('flagCloud', onFlagCloud);
+			//metaCloudPanel.addEventListener('deleteCloud', onDeleteCloud);
+
+
+
+			// Remote object events
+			cloudRemObj.destination = "CloudService";
+        	cloudRemObj.addEventListener("fault", onFault);
+
+        	cloudRemObj.searchCloud.addEventListener("result", onResultBrowseCloud);
+        	cloudRemObj.browseCloud.addEventListener("result", onResultBrowseCloud);
+        	//cloudRemObj.filterCloud.addEventListener("result", onResultBrowseLibrary);
+			cloudRemObj.deleteCloud.addEventListener("result", onResultDeleteCloud);
+			cloudRemObj.downloadCloud.addEventListener("result", onResultDownloadCloud);
+			cloudRemObj.flagCloud.addEventListener("result", onResultFlagCloud);
+			cloudRemObj.addCloudToFavorite.addEventListener("result", onResultAddCloudToFavorite);
+
+
+			// FIRST time: Simulate Browse Most Popular images
+			onBrowseLibrary(new CloudLibraryBrowseEvent('browse', '', 'useCount', CloudType.IMAGE));
+
+
+			// session
+			sessionController = CloudEngine.GetInstance().GetSessionController();
+			cloudSession = sessionController.GetSession();
+
+			// Cloud DownLoader
+			cloudLoader.cloudLibrary = this;
+			cloudLoader.progressBar = this.progressBar;
+		}
+
+
+
+		// CACHE RESULTS HERE
+
+		// Save CloudLibrary state in XML
+		public virtual function Save():XML
+		{
+			var browserXML:XML = new XML("<library></library>");
+
+			browserXML.@metaClouds = cloudLibraryList.metaClouds.copy();
+
+			return browserXML;
+		}
+
+
+		// Load CloudLibrary state in XML
+		public virtual function Load(libraryXML:XML):void
+		{
+			if(!libraryXML)
+				return;
+
+			cloudLibraryList.metaClouds = new XMLListCollection( libraryXML.@metaClouds );
+		}
+
+
+
+
+
+
+		// Search - Browse - Filter Events
+		// ----------------------------------
+
+		// SEARCH library
+		private function onSearchLibrary(event:CloudLibraryBrowseEvent):void
+		{
+			// SEARCH Clouds on the back-end Cloud Library
+			cloudRemObj.searchCloud(event.query, event.sortBy, event.itemType + 'Cloud');
+
+			cloudLibraryList.thumbDisplayState = event.sortBy; // set the state so the thumbs display the sortby attribute
+
+			CursorManager.setBusyCursor(); // Set the busy cursor
+		}
+
+		// BROWSE library
+		private function onBrowseLibrary(event:CloudLibraryBrowseEvent):void
+		{
+			// BROWSE Clouds on the back-end Cloud Library
+			cloudRemObj.browseCloud(event.sortBy, event.itemType + 'Cloud')
+
+			cloudLibraryList.thumbDisplayState = event.sortBy; // set the state so the thumbs display the browseby attribute
+
+			CursorManager.setBusyCursor(); // Set the busy cursor
+
+			progressBar.visible = true;
+			progressBar.setProgress(0, 100);
+		}
+
+		// SORT library
+		private function onSortMetaClouds(event:CloudLibraryBrowseEvent):void
+		{
+			cloudLibraryList.thumbDisplayState = event.query; // set the state so the thumbs display the sortby attribute
+			cloudLibraryList.sort(event.query, true);
+		}
+
+		// FILTER library
+		private function onFilterMetaClouds(event:CloudLibraryBrowseEvent):void
+		{
+			// BROWSE Clouds on the back-end Cloud Library
+			cloudRemObj.browseCloud(event.sortBy, event.itemType + 'Cloud')
+			//cloudRemObj.filterCloud(event.query);// BROWSE Clouds on the back-end
+
+			CursorManager.setBusyCursor(); // Remove the busy cursor
+
+			progressBar.visible = true;
+			progressBar.setProgress(0, 100);
+		}
+
+
+		private function Refresh():void
+		{
+			
+		}
+
+
+		// RESULT BROWSE CLOUDS
+		// ------------------------------
+
+        private function onResultBrowseCloud(event:ResultEvent):void 
+    	{
+			var metaCloudsXML:XMLList = XMLList(event.result).descendants(); // Retreive all the metaClouds sent by the back-end 
+
+			// Result Count Text
+			cloudCount.text = metaCloudsXML.length() + " " + cloudLibraryBrowser.GetCloudType();
+			if(metaCloudsXML.length() < 2) // singular
+			{
+				cloudCount.text =  metaCloudsXML.length() + " " + cloudLibraryBrowser.cloudTypeFilter.selectedItem.type;
+			}
+
+			// Set result Clouds
+			cloudLibraryList.SetMetaClouds(metaCloudsXML); // Set meta clouds
+
+			CursorManager.removeBusyCursor(); // Hide the busy cursor
+
+			progressBar.visible = true;
+			progressBar.setProgress(100, 100);
+    	}
+
+
+
+
+
+
+
+		// VALIDATE Cloud Action
+		private function ValidateCloud(selCloud:XML):Boolean
+		{
+			if(!selCloud || this.selMetaCloud != selCloud)
+			{
+				CloudAlert.show('Invalid Cloud', 'Cloud Library');
+				return false;
+			}
+			return true;
+		}
+
+
+
+		// Clicked cloud thumb
+		private function onClickMetaCloud(event:MetaCloudEvent):void
+		{
+			selMetaCloud = event.metaCloud; // SELECT meta Cloud
+			if(!ValidateCloud(selMetaCloud))
+				return;
+
+			var iconBitmap:Bitmap = null;
+
+			var item:CloudLibraryListItem = CloudLibraryListItem( cloudLibraryList.indexToItemRenderer( cloudLibraryList.selectedIndex ) );
+			if(item && item.cloudIconImage)
+			{
+				if(1) // TODO: If not broken LINK
+				{
+					iconBitmap = Bitmap(item.cloudIconImage.content)
+				}
+			}
+
+			metaCloudPanel.dispatchEvent(new MetaCloudEvent("metaCloudChange", selMetaCloud, iconBitmap))
+		}
+
+
+
+		// DOWNLOAD CLOUD
+		public function onDownloadCloud(event:MetaCloudEvent):void
+		{
+			var selCloud:XML = event.metaCloud;
+			if(!ValidateCloud(selCloud))
+				return;
+
+			if(!cloudSession.ValidateUser()) // Validate Registered User
+				return;
+	
+			var userID:String = cloudSession.userXML.@id;
+			var cloudID:String = selCloud.@id;
+
+			// Download Cloud
+			cloudRemObj.downloadCloud(userID, cloudID);
+
+			CursorManager.setBusyCursor(); // Set the busy cursor
+
+		}
+
+		// result Downloaded Cloud XML
+		private function onResultDownloadCloud(event:ResultEvent):void
+		{
+			CursorManager.removeBusyCursor(); // Hide the busy cursor
+
+			var cloudXML:XML = XML(event.result);
+
+			// TODO: validate path
+			if(!selMetaCloud.@dataPath)
+			{
+				CloudAlert.show('Invalid Cloud', 'Cloud Error');
+				return;
+			}
+
+			// DOWNLOAD CLOUD DATA in the CloudLoader
+			cloudLoader.DownloadCloud(selMetaCloud, cloudXML);
+		}
+
+
+
+
+
+		// Delete Cloud
+		private function onDeleteCloud(event:MetaCloudEvent):void
+		{
+			var selCloud:XML = event.metaCloud;
+			if(!ValidateCloud(selCloud))
+				return;
+
+			if(!cloudSession.ValidateUser()) // Validate Registered User
+				return;
+
+			// Do you really want to delete ?
+        	var alert:Alert = Alert.show("Do you really want to Delete the Cloud \'" + selCloud.@name + "\' ?", "Delete Cloud", 3, this, alertClickHandlerDelete);
+			alert.titleIcon = Globals.g_assets.TriCloudIcon16;
+		}
+
+		// Asked to confirm Session Deletion
+        private function alertClickHandlerDelete(event:CloseEvent):void 
+        {
+			if(event.detail==Alert.YES)
+            {
+            	DoDeleteCloud();
+            }
+            else
+            {
+            	return;
+            }
+        }
+
+		// Do Delete Cloud
+		private function DoDeleteCloud():void
+		{
+			if(!cloudSession.ValidateUser()) // Validate Registered User
+				return;
+
+			var userID:String = cloudSession.userXML.@id;
+			var cloudID:String = selMetaCloud.@id;
+
+			cloudRemObj.deleteCloud(userID, cloudID);
+
+			CursorManager.setBusyCursor(); // Set the busy cursor
+		}
+
+ 		private function onResultDeleteCloud(event:ResultEvent):void 
+    	{
+			CursorManager.removeBusyCursor(); // Hide the busy cursor
+    		//CloudAlert.show('', 'Cloud Library');
+
+    		Refresh();
+    	}
+
+
+
+		// ADD Cloud to FAVORITE
+		private function onAddFavoriteCloud(event:MetaCloudEvent):void
+		{
+			var selCloud:XML = event.metaCloud;
+			if(!ValidateCloud(selCloud))
+				return;
+
+			if(!cloudSession.ValidateUser()) // Validate Registered User
+				return;
+
+			var userID:String = cloudSession.userXML.@id;
+			var cloudID:String = selCloud.@id;
+
+			cloudRemObj.addCloudToFavorite(userID, cloudID); // Add Cloud to My Favorite
+
+			CursorManager.setBusyCursor(); // Set the busy cursor
+		}
+
+		private function onResultAddCloudToFavorite(event:ResultEvent):void
+		{
+			CursorManager.removeBusyCursor(); // Hide the busy cursor
+
+			var cloudName:String = event.result as String;
+
+			CloudAlert.show("The Cloud ''" + cloudName + "'' was added to your Favorite", "Cloud Favorite", Globals.g_assets.StarIcon);
+		}
+
+
+
+		// FLAG Cloud
+		private function onFlagCloud(event:MetaCloudEvent):void
+		{
+			var selCloud:XML = event.metaCloud;
+			if(!ValidateCloud(selCloud))
+				return;
+
+			if(!cloudSession.ValidateUser()) // Validate Registered User
+				return;
+
+			flagDialog.metaCloud = event.metaCloud; 
+			PopUpManager.addPopUp(flagDialog, this.parentApplication as DisplayObject, true);
+			PopUpManager.centerPopUp(flagDialog); // Center Flag dialog
+
+			flagDialog.addEventListener('flagCloud', onFlagCloudSubmit);
+		}
+
+		private function onFlagCloudSubmit(event:CloudFlagEvent):void
+		{
+			var selCloud:XML = event.metaCloud;
+			if(!ValidateCloud(selCloud))
+				return;
+
+			if(!cloudSession.userXML)
+			{
+				trace('un-logged user cant flag a cloud')
+				return;
+			}
+
+			var userID:String = cloudSession.userXML.@id;
+			var cloudID:String = selCloud.@id;
+
+			// Flag Cloud
+			cloudRemObj.flagCloud(userID, cloudID, event.reasonID, event.reasonText);
+
+			CursorManager.setBusyCursor(); // Set the busy cursor
+		}
+
+		private function onResultFlagCloud(event:ResultEvent):void
+		{
+			CursorManager.removeBusyCursor(); // Hide the busy cursor
+ 
+			PopUpManager.removePopUp(flagDialog);
+
+			CloudAlert.show("Thank you for the flagging, we will take actions shortly.", "Cloud Flag");
+		}
+
+
+
+		private function onFault(event:FaultEvent):void 
+        {
+            CursorManager.removeBusyCursor(); // Hide the busy cursor
+
+            CloudAlert.show(event.fault.faultString, 'Cloud Library Error');			
+        }
+
+
+
+
+
+		//   L I N K S
+
+		// View Cloud Page
+		private function onViewCloud(event:MetaCloudEvent):void
+		{
+			navigateToURL(new URLRequest('/cloud/index/' + event.metaCloud.@id), 'TriCloud');
+		}
+
+
+		// Comment Cloud
+		private function onCommentCloud(event:MetaCloudEvent):void
+		{
+			navigateToURL(new URLRequest('/cloud/index/' + event.metaCloud.@id), 'TriCloud');
+		}
+
+
+ 		// A TagLink was clicked in the metaCloud panel, follow that link by searching...
+		private function onTagLinkClick(event:TextEvent):void
+		{
+			// Set view to search
+			cloudLibraryBrowser.libraryViewStack.selectedIndex = 0;
+
+			// Set the tag link text in the search input box
+			cloudLibraryBrowser.searchInput.typedText = event.text;
+
+			// Search !!
+			cloudLibraryBrowser.onClickSearch();
+		}
+
+
+		// Author Link clicked in the metaCloud panel, follow the link by searching
+		private function onAuthorLinkClick(event:TextEvent):void
+		{
+			// Set view to search
+			cloudLibraryBrowser.libraryViewStack.selectedIndex = 0;
+
+			// Set the tag link text in the search input box
+			cloudLibraryBrowser.searchInput.typedText = 'user:' + event.text;
+
+			// Search !!
+			cloudLibraryBrowser.onClickSearch();
+		}
+		
+ 	]]>
+    </mx:Script>
+
+
+	<!--  BROWSER/SEARCH -->
+	<library:CloudLibraryBrowser id="cloudLibraryBrowser" width="100%"/>
+
+	<!-- RESULT BAR -->
+	<mx:HBox width="100%"
+		 horizontalAlign="left" verticalAlign="middle">
+
+		<mx:Label text="Results:" 
+			fontWeight="bold"/>
+
+		<mx:Spacer width="100%"/>
+
+		<mx:Label id="cloudCount" text="Results:" 
+			fontWeight="bold"/>
+
+	</mx:HBox>
+	
+
+	<!-- CLOUD LIBRARY LIST -->
+	<library:CloudLibraryList id="cloudLibraryList" width="100%" height="90%"/>
+
+	<!-- BOTTOM STATUS BAR -->
+	<mx:HBox width="100%"
+		 horizontalAlign="left" verticalAlign="middle">
+
+		<mx:Label text="Page 1" />
+
+		<mx:Spacer width="100%" />
+
+		<mx:Label id="statusText" text="status" />
+
+		<mx:ProgressBar id="progressBar" width="200" 
+			mode="manual"
+			indeterminate="true"
+			label="" labelPlacement="center" 
+			enabled="true"
+			visible="false"/>
+	</mx:HBox>
+
+
+</mx:Panel>
+

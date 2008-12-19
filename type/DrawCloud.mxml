@@ -1,0 +1,279 @@
+<?xml version="1.0" encoding="utf-8"?>
+<core:Cloud xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:core="core.*" xmlns:cloudDraw="type.draw.*"
+
+	creationComplete="onCreationComplete()"
+	mouseDown="onMouseDown(event)">
+
+
+	<mx:Script>
+    <![CDATA[
+		import mx.controls.Alert;
+		import mx.utils.ObjectUtil;
+
+		import type.draw.CPEvent;
+		import type.draw.DrawTag;
+		import type.draw.DrawTagEvent;
+		import type.draw.DrawStyle;
+
+
+		[Bindable]
+    	private var bitmap:Bitmap = null;
+
+		[Bindable]
+		public var drawStyle:DrawStyle = new DrawStyle(); // Draw Style
+
+
+
+		private function onCreationComplete():void
+		{
+			// we have to create a dummy Bitmap for drawCloud to have a fixed size and to be drawn to
+			if(!bitmap) // If Bitmap is null, if its not null, it has been duplicated or imported
+			{
+				var bmpData:BitmapData = new BitmapData(this.width, this.height, true, 0);
+				bitmap = new Bitmap(bmpData, "auto", true);
+			}
+		}
+
+		// BITMAP DATA accessors
+		public override function GetBitmapData():BitmapData
+		{
+			if(drawImage && drawImage.content)
+			{
+				return (Bitmap)(drawImage.content).bitmapData;
+			}
+			else
+			{
+				trace('invalid drawImage');
+				return null;
+			}
+		}
+		public override function SetBitmapData(bmpData:BitmapData):void
+		{
+			if(!bmpData)
+				return;
+
+			this.width = bmpData.width;
+			this.height = bmpData.height;
+			this.bitmap = new Bitmap(bmpData, "auto", true);
+		}
+
+
+
+		// Clone DrawCloud
+		public override function clone():Cloud
+		{
+			var drawCloud:DrawCloud = super.clone() as DrawCloud;
+			if(!drawCloud)
+				return null;
+
+			for each(var obj:Object in this.getChildren()) // for each child
+			{
+				if(obj is Image) // Dont process the Image Bitmap
+					continue;
+
+				var drawTag:DrawTag = DrawTag(obj); // Active drawTag on DrawCloud
+				if(!drawTag)
+					continue;
+
+				var dupDrawTag:DrawTag = drawTag.clone();
+				drawCloud.addChild( dupDrawTag ); // add drawTag to DrawCloud
+
+				// doesnt work?
+
+				//drawCloud.dispatchEvent(new DrawTagEvent('loadDrawTag', dupDrawTag));
+			}
+
+			// Bitmap
+			if(this.bitmap)
+			{
+				drawCloud.SetBitmapData(this.bitmap.bitmapData); 
+			}
+
+			// Draw Style
+			drawCloud.drawStyle = drawStyle.clone();
+
+			return drawCloud;
+		}
+
+
+		// Save DrawCloud XML
+		public override function Save():XML
+		{
+			var cloudXML:XML = super.Save();
+			var drawCloudXML:XML = new XML("<drawCloud></drawCloud>"); // Create drawCloud XML
+
+			for each(var obj:Object in this.getChildren()) // for each child
+			{
+				if(obj is Image) // Dont process the Image Bitmap
+					continue;
+
+				var drawTag:DrawTag = DrawTag(obj); // Active drawTag on DrawCloud
+				if(!drawTag)
+					continue;
+
+				var drawTagXML:XML = drawTag.Save(); // Save DrawTag XML
+				drawCloudXML.appendChild(drawTagXML); // Add DrawTag XML to DrawCloud XML
+			}
+
+			// If just modified the bitmap...
+			if(this.bitmap && CloudHistory.historySaveBinary)
+			{
+				var index:int = CloudHistory.saveBitmapData(this.bitmap.bitmapData); // Save bitmapData
+				drawCloudXML.@bitmapDataPath = index; // bitmapData path, -1 if nothing was saved
+			}
+
+			// Save DrawStyle XML, too expansive all the time
+			/*
+			var drawStyleXML:XML = drawStyle.Save(); // Create drawStyle XML
+			drawCloudXML.appendChild( drawStyleXML ); // Add DrawStyle XML to DrawCloud XML
+			*/
+
+			cloudXML.appendChild(drawCloudXML); // add drawCloud XML to cloud XML
+			return cloudXML;
+		}
+
+
+		// Load DrawCloud XML
+		public override function Load(cloudXML:XML):void
+		{
+			super.Load(cloudXML);
+			var drawCloudXML:XML = (cloudXML..drawCloud)[0];
+			if(drawCloudXML)
+			{
+				var drawTagsXML:XMLList = drawCloudXML..drawTag; // Retreive drawTags
+				for each(var drawTagXML:XML in drawTagsXML) // for each drawTag XML in drawTags XMLList
+				{
+					
+					var drawTag:DrawTag = this.getChildByName(drawTagXML.@localID) as DrawTag;
+					if(drawTag) // DrawTag already exist
+					{
+						drawTag.Load(drawTagXML); // Load DrawTag XML
+
+						//this.dispatchEvent(new DrawTagEvent('loadDrawTag', drawTag));
+					}
+					else // DrawTag doesnt exist, create it
+					{
+						var newDrawTag:DrawTag = DrawTag.DrawTagFactory(drawTagXML.@type); // Create drawTag
+						if(newDrawTag)
+						{
+							newDrawTag.Load(drawTagXML); //  Load DrawTag XML
+
+							this.addChild(newDrawTag);
+
+							// Simulate DrawTag.onMouseDown() here
+							newDrawTag.mouseEnabled = false; // avoid mouseOver on self.
+
+							// Compute offset between drawCloud and tagCloud
+							//newDrawTag.ComputeDrawCloudTagOffset();
+
+							//stage.focus = this;
+
+							// TODO: restore state of the drawController here
+
+							this.dispatchEvent(new DrawTagEvent('loadDrawTag', newDrawTag));
+						}
+					}
+				}
+
+				// Remove Zombie DrawTags
+				
+				
+				for each(var obj:Object in this.getChildren()) // for each child
+				{
+					if(obj is Image) // Dont process the Image Bitmap
+						continue;
+
+					var zdrawTag:DrawTag = DrawTag(obj); // Active drawTag on DrawCloud
+					if(!zdrawTag)
+						continue;
+
+					// Find if this drawTag in the XML
+					var aliveDrawTags:XMLList = drawTagsXML.(@localID == zdrawTag.localID);
+					if(aliveDrawTags.length() == 0) // this drawTag is dead
+					{
+						if(this.contains(zdrawTag)) // make sure the drawTag is contained in this drawCloud
+	            		{
+							this.removeChild(zdrawTag); // remove drawTag
+							//UnSelectCloud(); // UnSelect current Cloud
+	            			trace('Removed Zombie DrawTag: ' + drawTagsXML.@localID);
+
+	            			this.dispatchEvent(new DrawTagEvent('deleteDrawTag', zdrawTag));
+	            		}
+					}
+				}
+
+
+				// DrawStyle
+				var drawStyleXML:XML = (drawCloudXML.drawStyle)[0]; // Retreive drawStyle
+				if(drawStyleXML)
+				{
+					this.drawStyle.Load(drawStyleXML); // Load DrawStyle XML
+				}
+
+
+				var index:int = drawCloudXML.@bitmapDataPath;
+				var bitmapData:BitmapData = CloudHistory.loadBitmapData(index); // Load BitmapData
+				if(bitmapData)
+				{
+					this.SetBitmapData(bitmapData);
+				}
+				else
+				{
+					trace('Load DrawCloud: Error loading binary data at path: ' + index);
+				}
+			}
+		}
+
+
+
+
+
+		
+		public override function onFocus():void
+		{
+			super.onFocus();
+
+			// show control points
+		}
+
+		public override function onLoseFocus():void
+		{
+			super.onLoseFocus();
+
+			// hide control points
+			//if()
+		}
+
+
+		private function onMouseDown(mouseEvent:MouseEvent):void
+		{
+			
+		}
+
+
+		private function onClickControlPoint(cpEvent:CPEvent):void
+		{
+			
+		}
+
+
+
+
+		// KEYBOARD Handler
+		protected override function keyDownHandler(event:KeyboardEvent):void
+		{
+			super.keyDownHandler(event);
+
+			if(event)
+			{
+				
+			}
+		}
+
+	]]>
+    </mx:Script>
+
+
+	<mx:Image id="drawImage" source="{bitmap}" width="100%" height="100%" />
+
+</core:Cloud>

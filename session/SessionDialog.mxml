@@ -1,0 +1,813 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:fc="com.adobe.flex.extras.controls.*" 
+	width="700" height="600"
+	maxWidth="700" maxHeight="600"
+	layout="vertical"
+	currentState="load"
+	title=""
+	horizontalScrollPolicy="off" verticalScrollPolicy="off"
+	showCloseButton="true"
+
+	styleName="CloudDialog"
+	titleStyleName="CloudDialogTitle"
+
+	creationComplete="onCreationComplete()">
+
+
+	<mx:Script>
+    <![CDATA[
+
+    	import mx.messaging.Session;
+		import mx.controls.Alert;
+		import mx.managers.CursorManager;
+		import mx.events.CloseEvent;
+		import mx.events.ListEvent;
+		import mx.rpc.remoting.RemoteObject;
+        import mx.rpc.events.*;
+        import mx.collections.XMLListCollection;
+        import mx.events.ItemClickEvent;
+        import mx.managers.PopUpManager;
+
+		import com.adobe.images.PNGEnc;
+		import com.adobe.images.JPGEncoder;
+
+
+		// Static instance, singleton
+		public static const sessionDialog:SessionDialog = new SessionDialog();
+
+
+		private var sessionController:SessionController = null;
+
+		[Bindable]
+		private var cloudSession:CloudSession = null;
+
+		[Bindable]
+		private var sessionBitmap:Bitmap = null;
+
+		// RoR RO
+        private var sessionRemObj:RemoteObject = new RemoteObject();
+
+
+		[Bindable]
+		private var metaSessionsXML:XMLListCollection = null; // meta Sessions
+
+		[Bindable]
+		private var selectedSession:XML = null; // Selected session in the data grid
+
+
+		// Load
+		private var loadedSessionXML:XML = null;
+
+		private var sessionLoader:URLLoader = new URLLoader(); // Session Data Downloader
+
+
+		// Save
+		private var saveDataID:String = ''; // Data encoded id for Session saving
+
+
+		[Bindable]
+		private var userXML:XML = null;
+
+
+
+		private function onCreationComplete():void
+		{
+			// Set the Right Click menu for this Dialog
+   			var rightClickMenu:RightClickMenu = new RightClickMenu(this.title);
+   			this.contextMenu = rightClickMenu.triCloudContextMenu;
+
+			sessionController = CloudEngine.GetInstance().GetSessionController();
+			cloudSession = sessionController.GetSession();
+
+
+			// Remote object events
+			sessionRemObj.destination = "SessionService";
+        	sessionRemObj.loadMetaSessions.addEventListener("result", onResultLoadMetaSessions);
+        	sessionRemObj.loadSession.addEventListener("result", onResultLoadSession);
+        	sessionRemObj.saveSession.addEventListener("result", onResultSaveSession);
+        	sessionRemObj.saveSessionData.addEventListener("result", onResultSaveSessionData);
+        	sessionRemObj.saveSessionIcon.addEventListener("result", onResultSaveSessionIcon);
+			sessionRemObj.renameSession.addEventListener("result", onResultRenameSession);
+			sessionRemObj.deleteSession.addEventListener("result", onResultDeleteSession);
+
+			sessionRemObj.addEventListener("fault", onFault);
+
+
+			// Session Data Download progress
+			sessionLoader.addEventListener(Event.OPEN, onSessionDownloadStarted);
+			sessionLoader.addEventListener(ProgressEvent.PROGRESS, onSessionDownloadProgress);
+			sessionLoader.addEventListener(Event.COMPLETE, onSessionDownloadCompleted);
+
+			// Session Data download errors
+			sessionLoader.addEventListener(SecurityErrorEvent.SECURITY_ERROR, onSecurityError);
+			sessionLoader.addEventListener(HTTPStatusEvent.HTTP_STATUS, onHttpError);
+			sessionLoader.addEventListener(IOErrorEvent.IO_ERROR, onIOError);
+
+			// FIRST TIME
+			if(InitCheckUser()) // Do various check
+			{
+				LoadMetaSessions(); // Do various check
+			}
+		}
+
+
+		public function init(action:String):void
+		{
+			this.setCurrentState(action); // 'load' or 'save'
+
+			if(action == 'load')
+			{
+				this.title = "Load My Session";
+			}
+			else if(action == 'save')
+			{
+				this.title = "Save My Session";
+			}
+
+			// Session Controller
+			if(sessionController)
+			{
+				cloudSession = sessionController.GetSession();
+			}
+
+			// NOT FIRST TIME
+			if(InitCheckUser()) // Do various check
+			{
+				LoadMetaSessions(); // Load meta session from back-end for this user
+			}
+		}
+
+
+
+		private function InitCheckUser():Boolean
+		{
+			// Not first time opened
+			if(!cloudSession || !cloudSession.canvas || !cloudSession.canvas.parentApplication)
+			{
+				return false;
+			}
+
+			// Resize Window
+			this.width = Math.min(maxWidth, cloudSession.canvas.parentApplication.width);
+			this.height = Math.min(maxHeight, cloudSession.canvas.parentApplication.height);
+
+			if(this.currentState == 'save') // If save dialog, update icon
+			{
+				cloudSession.canvas.UpdateIconBitmap();
+				this.sessionBitmap = cloudSession.canvas.iconBitmap;
+			}
+
+			userXML = cloudSession.userXML;
+
+			if(!cloudSession.ValidateUser())
+				return false;
+
+			return true;
+		}
+
+
+
+		// Apollo: List local saved sessions
+		private function ListLocalSessions():void
+		{
+			
+		}
+
+		private function onClickRefresh():void
+		{
+			LoadMetaSessions();
+		}
+
+
+		// L I S T 
+
+		// LIST remote saved sessions
+		private function LoadMetaSessions():void
+		{
+			if(!cloudSession || !cloudSession.userXML)
+				return;
+
+			sessionRemObj.loadMetaSessions(cloudSession.userXML.@id);
+
+        	CursorManager.setBusyCursor(); // Set the busy cursor
+			sessionCtlBar.enabled = false;
+		}
+
+        private function onResultLoadMetaSessions(event:ResultEvent):void 
+    	{
+    		sessionCtlBar.enabled = true;
+    		CursorManager.removeBusyCursor(); // Remove the busy cursor
+
+			var sessionsXML:XMLList = (XMLList(event.result).descendants()); 
+			metaSessionsXML = new XMLListCollection(sessionsXML);
+    	}
+
+
+		// CLICK Session : Select a session from the list
+		private function onItemClickSession(event:ListEvent):void
+		{
+			if(!mySessions)
+				return;
+
+			selectedSession = mySessions.selectedItem as XML;
+
+			if(this.currentState == 'load') // Load
+			{
+				sessionImage.source = selectedSession.@iconPath; // load PNG from server
+			}
+			else // Save
+			{
+				sessionImage.source = sessionBitmap; // display current canvas
+			}
+
+			sessionNameInput.text = selectedSession.@name;
+		}
+
+	
+		// DOUBLE-CLICK Session
+		private function onItemDoubleClickSession(event:ListEvent):void
+		{
+			onItemClickSession(event); // Make sure its selected
+
+			if(this.currentState == 'load')
+			{
+				onClickOk(); // load session
+			}
+		}
+
+
+
+
+		// Clicked Load or Save
+		private function onClickOk():void
+		{
+			if(this.currentState == 'load')
+			{
+				onClickLoad();
+			}
+			else if(this.currentState == 'save')
+			{
+				onClickSave();
+			}
+		}
+
+
+
+		// L O A D
+
+		// LOAD selected session
+		private function onClickLoad():void
+		{
+			if(!metaSessionsXML || !metaSessionsXML.source)
+				return;
+
+			var existingSessions:XMLList = metaSessionsXML.source.(@name == sessionNameInput.text);
+			if(existingSessions.length() == 0) // Session doesnt exist
+			{
+				CloudAlert.show('The Session \'' + sessionNameInput.text + '\' does not exist', 'Load Session');
+				return;
+			}
+
+			mySessions.findString(sessionNameInput.text);
+			if(!selectedSession || !cloudSession.userXML || selectedSession.@name != sessionNameInput.text)
+			{
+				CloudAlert.show('Invalid Session', 'Delete Session');
+				return;
+			}
+
+			progressBar.visible = true;
+			progressBar.setProgress(0,100);
+			progressBar.label = "Loading Session '" + sessionNameInput.text + "'...";
+
+			var userID:String = cloudSession.userXML.@id;
+			var sessionID:String = selectedSession.@id;
+
+			sessionRemObj.loadSession(userID, sessionID); // LOAD SESSION from back-end
+
+        	CursorManager.setBusyCursor(); // Set the busy cursor
+			sessionCtlBar.enabled = false;
+		}
+
+		// result load
+ 		private function onResultLoadSession(event:ResultEvent):void 
+    	{
+    		loadedSessionXML = XML(event.result);
+    		if(!loadedSessionXML)
+    		{
+    			progressBar.visible = false;
+				sessionCtlBar.enabled = true;
+    			CursorManager.removeBusyCursor(); // Remove the busy cursor
+    			CloudAlert.show("Error loading session", "Load Session");
+    			return;
+    		}
+
+			progressBar.setProgress(25,100);
+			progressBar.label = "Loading Session Data for '" + sessionNameInput.text + "'...";
+
+			if(!selectedSession || !selectedSession.@dataPath)
+			{
+				progressBar.visible = false;
+				sessionCtlBar.enabled = true;
+    			CursorManager.removeBusyCursor(); // Remove the busy cursor
+				CloudAlert.show("Invalid Session Data Path", "Load Session");
+    			return;
+			}
+
+			// Download Session Data
+			var request:URLRequest = new URLRequest(selectedSession.@dataPath);
+			request.method = "GET"; // this is the default 
+			//request.data =  variable;
+
+			// Load Cloud
+			sessionLoader.load(request);
+    	}
+
+		// Session Data Download started
+		private function onSessionDownloadStarted(event:Event):void
+		{
+			
+		}
+
+		// PROGRESS
+		private function onSessionDownloadProgress(event:ProgressEvent):void
+		{
+			progressBar.setProgress(event.bytesLoaded, event.bytesTotal);
+			//progressBar.label = "Downloading '" + selMetaCloud.@name + "' " + 
+			//	Globals.GetFileSize(event.bytesLoaded) + "/" + Globals.GetFileSize(event.bytesTotal) + " bytes...";
+		}
+
+		// Session Data Download Completed
+		private function onSessionDownloadCompleted(event:Event):void
+		{
+			// Session Data
+		    var bytes:ByteArray = new ByteArray();
+		    bytes.writeObject(sessionLoader.data);
+
+			LoadSavedSession(bytes);
+		}
+
+		// Load Session XML and Data
+		private function LoadSavedSession(bytes:ByteArray):void
+		{
+			progressBar.setProgress(80,100);
+			progressBar.label = "Loading Session";
+
+			// Load session XML
+    		sessionController.LoadSavedSession(loadedSessionXML, bytes);
+
+			progressBar.setProgress(100,100);
+			progressBar.label = "Session Loaded";
+			progressBar.visible = false;
+
+			sessionCtlBar.enabled = true;
+    		CursorManager.removeBusyCursor(); // Remove the busy cursor
+
+    		this.dispatchEvent(new Event("close")); // Close window
+		}
+
+
+
+
+
+
+		// S A V E
+
+		// SAVE session
+		private function onClickSave():void
+		{
+			if(!cloudSession || !cloudSession.userXML)
+				return;
+
+			// todo: use validator
+			if(sessionNameInput.text.length == 0)
+			{
+				CloudAlert.show("Invalid session name", 'Session Error');
+				return;
+			}
+
+			var existingSessions:XMLList = metaSessionsXML.source.(@name == sessionNameInput.text);
+			if(existingSessions.length() > 0) // A session with the same name already exists
+			{
+				//var test:Object = mySessions.getChildByName(sessionNameInput.text); // select it, how?
+
+				// Do you want to overwrite ?
+	        	var alert:Alert = Alert.show("Do you want to Overwrite the Session \'" + sessionNameInput.text + "\' ?", "Overwrite Session", 3, this, alertClickHandlerOverwrite);
+				alert.titleIcon = Globals.g_assets.TriCloudIcon16;
+			}
+			else
+			{
+				DoSaveSession();
+			}
+		}
+
+		// Asked to confirm Session Overwrite
+        private function alertClickHandlerOverwrite(event:CloseEvent):void 
+        {
+			if(event.detail==Alert.YES)
+            {
+            	DoSaveSession();
+            }
+            else
+            {
+            	return;
+            }
+        }
+
+		// Do save session
+		private function DoSaveSession():void
+		{
+			if(!cloudSession || !cloudSession.userXML)
+				return;
+
+			progressBar.visible = true;
+			progressBar.setProgress(0,100);
+			progressBar.label = "Saving Session '" + sessionNameInput.text + "'...";
+
+			var userID:String = cloudSession.userXML.@id;
+			var sessionID:String = cloudSession.remoteID;
+
+			var sessionXML:XML = cloudSession.Save(); // Save session XML, the whole deal
+			sessionXML.@name = sessionNameInput.text; // session name input
+			sessionXML.@type = 'ImageSession';
+			sessionXML.@attribute = 'Private';
+			sessionXML.@description = 'todo';
+
+			// Save
+			sessionRemObj.saveSession(userID, sessionID, sessionXML.toXMLString()); // SAVE session to back-end
+
+        	CursorManager.setBusyCursor(); // Set the busy cursor
+			sessionCtlBar.enabled = false;
+		}
+
+		// result save Session
+  		private function onResultSaveSession(event:ResultEvent):void 
+    	{
+    		saveDataID = event.result as String;
+
+    		progressBar.setProgress(50,100);
+    		progressBar.label = "Saving Session Data '" + sessionNameInput.text + "'...";
+
+    		// Retreive session Data, TODO
+    		var bmpData:BitmapData = CloudHistory.historyDataList[CloudHistory.historyDataList.length-1];
+			var rec:Rectangle = new Rectangle(0,0, bmpData.width, bmpData.height);
+			var bytes:ByteArray = bmpData.getPixels(rec);
+			bytes.compress();
+
+    		sessionRemObj.saveSessionData(saveDataID, bytes); // SAVE session data to back-end
+    	}
+
+		// result Save Session Data
+		private function onResultSaveSessionData(event:ResultEvent):void
+		{
+			var dataPath:String = event.result as String;
+
+			progressBar.setProgress(95,100);
+			progressBar.label = "Saving Session Icon '" + sessionNameInput.text + "'...";
+
+			if(!sessionBitmap)
+			{
+				var dummyBmpData:BitmapData = new BitmapData(1,1);
+				sessionBitmap = new Bitmap(dummyBmpData); // TODO, default TriCloud icon
+			}
+
+			var bmpData:BitmapData = this.sessionBitmap.bitmapData;
+			var pngBytes:ByteArray = PNGEnc.encode(bmpData); // Encode Canvas icon into PNG
+
+			sessionRemObj.saveSessionIcon(saveDataID, pngBytes); // SAVE session icon to back-end
+		}
+
+		// result Save Session Icon
+		private function onResultSaveSessionIcon(event:ResultEvent):void
+		{
+			var iconPath:String = event.result as String;
+
+			progressBar.setProgress(100,100);
+			progressBar.visible = false;
+
+			sessionCtlBar.enabled = true;
+			CursorManager.removeBusyCursor(); // Remove the busy cursor
+
+			this.dispatchEvent(new Event("close"));
+
+			CloudAlert.show('The Session \'' + sessionNameInput.text + '\' was successfully saved', 'Session Saved');
+		}
+
+
+		
+		// SESSION BUTTONS
+
+		private function onItemClickSessionBtn(event:ItemClickEvent):void
+		{
+			if(!event.item)
+				return;
+
+			if(event.item.name == "rename")
+			{
+				onClickRename();
+			}
+			else if(event.item.name == "delete")
+			{
+				onClickDelete();
+			}
+			else if(event.item.name == "refresh")
+			{
+				onClickRefresh();
+			}
+			else if(event.item.name == "share")
+			{
+				onClickShare();
+			}
+		}	
+
+
+
+		// R E N A M E
+
+		// Rename Session
+		private function onClickRename():void
+		{
+			
+		}
+
+		// result rename Session
+		private function onResultRenameSession(event:ResultEvent):void
+		{
+			
+		}
+
+
+		// D E L E T E
+
+		// DELETE session
+		private function onClickDelete():void
+		{
+			if(!metaSessionsXML || !metaSessionsXML.source)
+				return;
+
+			var existingSessions:XMLList = metaSessionsXML.source.(@name == sessionNameInput.text);
+			if(existingSessions.length() == 0) // Session doesnt exist
+			{
+				CloudAlert.show('The Session \'' + sessionNameInput.text + '\' does not exist', 'Delete Session');
+				return;
+			}
+
+			// make sure its selected
+			mySessions.findString( sessionNameInput.text );
+
+			// Do you really want to delete ?
+        	var alert:Alert = Alert.show("Do you really want to Delete the Session \'" + sessionNameInput.text + "\' ?", "Delete Session", 3, this, alertClickHandlerDelete);
+			alert.titleIcon = Globals.g_assets.TriCloudIcon16;
+		}
+
+
+		// Asked to confirm Session Deletion
+        private function alertClickHandlerDelete(event:CloseEvent):void 
+        {
+			if(event.detail==Alert.YES)
+            {
+            	DoDeleteSession();
+            }
+            else
+            {
+            	return;
+            }
+        }
+
+		// Do Delete session
+		private function DoDeleteSession():void
+		{
+			mySessions.findString(sessionNameInput.text);
+			if(!selectedSession || !cloudSession.userXML || selectedSession.@name != sessionNameInput.text)
+			{
+				CloudAlert.show('Invalid Session', 'Delete Session');
+				return;
+			}
+
+			var userID:String = cloudSession.userXML.@id;
+			var sessionID:String = selectedSession.@id;
+
+			sessionRemObj.deleteSession(userID, sessionID); // DELETE SESSION from back-end
+
+        	CursorManager.setBusyCursor(); // Set the busy cursor
+			sessionCtlBar.enabled = false;
+		}
+
+		private function onResultDeleteSession(event:ResultEvent):void
+		{
+			sessionCtlBar.enabled = true;
+			CursorManager.removeBusyCursor(); // Remove the busy cursor
+
+			LoadMetaSessions();
+		}
+
+
+		// Share Session
+		private function onClickShare():void
+		{
+			CloudAlert.show('Share Session, Soon', 'Session Error');
+		}
+
+
+		// Remote object handlers
+		// ------------------------------
+		private function onFault(event:FaultEvent):void 
+        {
+            sessionCtlBar.enabled = true;
+            CursorManager.removeBusyCursor(); // Remove the busy cursor
+
+			progressBar.visible = false;
+
+            CloudAlert.show(event.fault.faultString, okButton.label + ' Session Error');
+        }
+
+
+
+		// Session Data Download ERRORS
+		private function onSecurityError(securityErrorEvent:SecurityErrorEvent):void
+		{
+			sessionCtlBar.enabled = true;
+    		CursorManager.removeBusyCursor(); // Remove the busy cursor
+			progressBar.visible = false;
+			CloudAlert.show(securityErrorEvent.text, "Security Error");
+		}
+		private function onHttpError(httpStatusEvent:HTTPStatusEvent):void
+		{
+			sessionCtlBar.enabled = true;
+    		CursorManager.removeBusyCursor(); // Remove the busy cursor
+			progressBar.visible = false;
+			CloudAlert.show(httpStatusEvent.type, "Http Error");
+		}
+		private function onIOError(ioErrorEvent:IOErrorEvent):void
+		{
+			sessionCtlBar.enabled = true;
+    		CursorManager.removeBusyCursor(); // Remove the busy cursor
+			progressBar.visible = false;
+			CloudAlert.show(ioErrorEvent.text, "IO Error");
+		}
+
+
+		// Control Bar Events
+		// ----------------------------------
+
+		private function onClickCancel():void
+		{
+			this.dispatchEvent(new Event("close"));
+		}
+
+    ]]>
+    </mx:Script>
+
+
+
+	<mx:HDividedBox width="100%" height="100%">
+
+		<!-- SAVED SESSIONS -->
+		<mx:VBox width="50%" height="100%"
+			verticalGap="0">
+
+			<mx:VBox label="My Sessions" width="100%" height="100%">
+				<mx:DataGrid id="mySessions" width="100%" height="100%" 
+					useRollOver="false"
+					dataProvider="{metaSessionsXML}"
+					labelField="@name"
+					doubleClickEnabled="true"
+					itemClick="onItemClickSession(event)"
+					itemDoubleClick="onItemDoubleClickSession(event)">
+					<mx:columns>
+				   		<mx:DataGridColumn dataField="@name" headerText="Name"/>
+				   		<mx:DataGridColumn dataField="@created" headerText="Created"/>
+				   		<mx:DataGridColumn dataField="@modified" headerText="Modified"/>
+					</mx:columns>
+				</mx:DataGrid>
+			</mx:VBox>
+
+
+			<mx:HBox width="100%" verticalAlign="middle"
+				paddingTop="5">
+
+			 	<mx:Label text="Session Name:"/>
+			 	<mx:TextInput id="sessionNameInput" width="100%" />
+			 	<!-- Buggy in Dialogs -->
+				<!--fc:AutoComplete id="sessionNameInput" width="100%"
+					lookAhead="true"
+					keepLocalHistory="false"
+					dataProvider="{metaSessionsXML.source}"
+					labelField="@name"
+					typedTextChange="mySessions.findString( sessionNameInput.text );"
+					change="mySessions.findString( sessionNameInput.text );"/-->
+
+			</mx:HBox>
+
+		</mx:VBox>
+
+
+		<!-- SELECTED SESSION IMAGE & INFOS -->
+		<mx:VBox width="50%" height="100%" 
+			verticalAlign="middle" horizontalAlign="left"
+			verticalGap="0"
+			horizontalScrollPolicy="off" verticalScrollPolicy="off"
+			borderStyle="solid">
+
+			<mx:Image id="sessionImage" width="100%" height="85%" 
+				maintainAspectRatio="true"
+				source="{sessionBitmap}" />
+
+			<mx:HBox width="100%" horizontalAlign="center">
+				<mx:LinkBar id="cloudTreeButtons"
+					horizontalGap="0" separatorWidth="2"
+					paddingTop="0" paddingBottom="0" paddingRight="0" paddingLeft="0"
+					borderStyle="solid" borderSides="left, top, right"
+					itemClick="onItemClickSessionBtn(event)">
+					<mx:Array>
+						<mx:Object name="rename" icon="{Globals.g_assets.DuplicateCloudIcon}" toolTip="Rename Session" />
+						<mx:Object name="delete" icon="{Globals.g_assets.MergeCloudIcon}" toolTip="Delete Session" />
+						<mx:Object name="share" icon="{Globals.g_assets.DeleteCloudIcon}" toolTip="Share Session" />
+						<mx:Object name="refresh" icon="{Globals.g_assets.DeleteCloudIcon}" toolTip="Refresh the Sessions" />
+					</mx:Array>
+				</mx:LinkBar>
+			</mx:HBox>
+
+			<mx:Form verticalGap="0" width="100%" height="15%"
+				paddingTop="5" paddingBottom="5"
+				borderStyle="solid" borderSides="top">
+
+				<mx:FormItem label="Session Name:">
+					<mx:Label id="sessionName" text="{(this.currentState == 'load' ? selectedSession.@name : cloudSession.name)}" />	
+				</mx:FormItem>
+
+				<mx:FormItem label="Author:">
+					<mx:Label id="sessionAuthor" text="{(this.currentState == 'load' ? selectedSession..user.@name : cloudSession.userXML.name)}" />	
+				</mx:FormItem>
+
+				<mx:FormItem label="Created:">
+					<mx:Label id="sessionCreated" text="{(this.currentState == 'load' ? selectedSession.@created : cloudSession.created.toDateString())}" />	
+				</mx:FormItem>
+
+				<mx:FormItem label="Last Modified:">
+					<mx:Label id="sessionModified" text="{(this.currentState == 'load' ? selectedSession.@modified : cloudSession.modified.toDateString())}" />	
+				</mx:FormItem>
+
+				<mx:FormItem label="Description:">
+					<mx:Label id="sessionDescription" text="{(this.currentState == 'load' ? selectedSession.@description : cloudSession.description)}" />
+				</mx:FormItem>
+
+			</mx:Form>
+
+
+			<mx:HBox horizontalGap="0" horizontalAlign="center" verticalAlign="middle" width="100%" 
+				borderStyle="solid" borderSides="top">
+				<mx:Label text="You can also Manage your Sessions in"/>
+				<mx:LinkButton label="My Portfolio" toolTip="My Private online Portfolio"
+					click="navigateToURL(new URLRequest('/portfolio/index/' + userXML.@id + '?view=private'), 'TriCloud');"/>
+			</mx:HBox>
+
+			<mx:HBox horizontalGap="0" horizontalAlign="center" verticalAlign="middle" width="100%" 
+				borderStyle="solid" borderSides="top">
+				<mx:Label text="Also explore Public Sessions in the"/>
+				<mx:LinkButton label="Community" toolTip="Tutorials, Techniques, Demos and more!"
+					click="navigateToURL(new URLRequest('/community'), 'TriCloud');"/>
+			</mx:HBox>
+		</mx:VBox>
+
+	</mx:HDividedBox>
+	
+
+	<mx:ProgressBar id="progressBar" width="100%" 
+		mode="manual"
+		label="" labelPlacement="top" 
+		enabled="true"
+		visible="false" includeInLayout="{progressBar.visible}"/>
+
+
+	<mx:ControlBar id="sessionCtlBar">
+		<mx:Button id="okButton" label="Ok" click="onClickOk()" styleName="OkButton"/>
+		<mx:Button id="cancelButton" label="Cancel" click="onClickCancel()" styleName="CancelButton"/>
+	</mx:ControlBar>
+
+
+	<!-- VALIDATORS -->
+	<mx:StringValidator id="sessionNameValidator" source="{sessionNameInput}" property="text"
+		required="true"
+		minLength="1" maxLength="64"
+		requiredFieldError="A session name is required."
+		tooShortError="The minimum length for a cloud name is 1." 
+        tooLongError="The maximum length for a cloud name is 64." 
+        trigger="{okButton}" triggerEvent="click"/>
+
+
+	<mx:states>
+		<mx:State name="load">
+			<mx:SetProperty target="{okButton}" name="label" value="Load" />
+		</mx:State>
+
+		<mx:State name="save">
+			<mx:SetProperty target="{okButton}" name="label" value="Save" />
+		</mx:State>
+
+		<mx:State name="busy">
+			<mx:SetProperty target="{sessionCtlBar}" name="enabled" value="false"/>
+			<mx:SetProperty target="{progressBar}" name="visible" value="true"/>
+		</mx:State>
+	</mx:states>
+
+</mx:TitleWindow>

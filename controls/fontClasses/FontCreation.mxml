@@ -1,0 +1,240 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml" 
+	layout="vertical"
+	titleIcon="{Globals.g_assets.NewTextCloudIcon}"
+	title="Import/Create Font"
+	horizontalScrollPolicy="off" verticalScrollPolicy="off"
+	showCloseButton="true"
+
+	styleName="CloudDialog"
+	titleStyleName="CloudDialogTitle"
+	horizontalAlign="center"
+
+	creationComplete="onCreationComplete()"
+	close="onClickCancel()">
+
+
+	<mx:Script>
+	<![CDATA[
+
+		import mx.managers.PopUpManager;
+		import mx.controls.SWFLoader;
+
+
+		// Static instance, singleton
+		public static var fontCreation:FontCreation = new FontCreation();
+
+
+		private var fileRef:FileReference = null; // For font import
+
+
+		private function onCreationComplete():void
+		{
+			
+		}
+
+		public function init():void
+		{
+			fontLoader.visible = false;
+
+			createdFontText.visible = false;
+			shareFontText.visible = false;
+			okButton.enabled = false;
+		}
+
+
+		private function onClickImportFont():void
+		{
+			fileRef = new FileReference();
+			var fontTypes:FileFilter = new FileFilter("Fonts (*.ttf, *.swf)", "*.ttf; *.swf;");
+			var allTypes:Array = new Array(fontTypes);
+
+			fileRef.addEventListener(Event.SELECT, onSelectFile); // listen for "ok" click 
+
+			var bSucc:Boolean = fileRef.browse(allTypes); // Browse local file system
+			if(!bSucc)
+			{
+				CloudAlert.show("Error opening the file browser", 'Font Error');
+			}
+		}
+
+
+		// On image file selected
+		private function onSelectFile(event:Event):void
+		{
+			// TODO : Validate size
+			if(fileRef.size < 1000000)
+			{
+				UploadFile(); // 1) Upload the Font File
+			}
+			else
+			{
+				CloudAlert.show("File too Big!", "File Upload");
+			}
+		}
+
+
+
+		// Upload the File
+		private function UploadFile():void
+		{
+			// upload errors
+			fileRef.addEventListener(SecurityErrorEvent.SECURITY_ERROR, onSecurityError);
+			fileRef.addEventListener(HTTPStatusEvent.HTTP_STATUS, onHttpError);
+			fileRef.addEventListener(IOErrorEvent.IO_ERROR, onIOError);
+
+			// upload progress
+			fileRef.addEventListener(Event.OPEN, onUploadStarted);
+			fileRef.addEventListener(ProgressEvent.PROGRESS, onUploadProgress);
+			fileRef.addEventListener(Event.COMPLETE, onCompleteUpload);
+
+			// UPLOAD
+			var request:URLRequest = new URLRequest(Globals.UPLOAD_TEMP_FONT);
+		    request.method = URLRequestMethod.POST;
+		    try
+		    {
+		       	fileRef.upload(request);
+		    }
+		    catch(error:Error)
+		    {
+		        CloudAlert.show("Unable to upload file.", "File Upload");
+		    }
+		}
+
+
+		// Upload PROGRESS
+		private function onUploadStarted(event:Event):void
+		{
+			progressBar.visible = true;
+			progressBar.label = "Uploading Font...";
+			progressBar.setProgress(0, fileRef.size);
+		}
+		private function onUploadProgress(progressEvent:ProgressEvent):void
+		{
+			progressBar.setProgress(progressEvent.bytesLoaded, progressEvent.bytesTotal);
+			progressBar.label = "Uploading '" + fileRef.name + "' " + 
+				Globals.GetFileSize(progressEvent.bytesLoaded) + "/" + Globals.GetFileSize(progressEvent.bytesTotal) + " bytes...";
+		}
+
+
+		// Upload Completed
+		private function onCompleteUpload(event:Event):void
+		{
+		   	// ... conversion process on server..
+
+			
+
+			DownloadFile(fileRef.name); // 2) Download the SWF font file
+		}
+
+
+		// Download the resulting SWF file
+		private function DownloadFile(fileName:String):void
+		{
+			fontLoader.source = Globals.TEMP_FONTS_PATH + fileName;
+		}
+
+		private function onDownloadStarted(event:Event):void
+		{
+			progressBar.visible = true;
+			progressBar.label = "Downloading Font...";
+			progressBar.setProgress(0,0);
+		}
+
+		private function onDownloadProgress(event:ProgressEvent):void
+		{
+			progressBar.setProgress(event.bytesLoaded, event.bytesTotal);
+			progressBar.label = "Downloading '" + Globals.GetFileName(fontLoader.source.toString())+ "' " + 
+				Globals.GetFileSize(event.bytesLoaded) + "/" + Globals.GetFileSize(event.bytesTotal) + ".";
+		}
+
+		// Finished Downloading SWF font
+		private function onDownloadCompleted(event:Event):void
+		{
+			progressBar.label = "Downloaded Font '" + Globals.GetFileName(fontLoader.source.toString()) + "'";
+			progressBar.visible = false;
+
+			// Show imported font locally
+			fontLoader.visible=true;
+
+			// Able to Import
+			createdFontText.visible = true;
+			shareFontText.visible = true;
+			okButton.enabled = true;
+		}
+
+
+
+		// Upload/Download ERRORS
+		private function onSecurityError(securityErrorEvent:SecurityErrorEvent):void
+		{
+			CloudAlert.show(securityErrorEvent.text, "Security Error");	
+		}
+		private function onHttpError(httpStatusEvent:HTTPStatusEvent):void
+		{
+			//CloudAlert.show(httpStatusEvent.type, "Http Error");
+		}
+		private function onIOError(ioErrorEvent:IOErrorEvent):void
+		{
+			CloudAlert.show(ioErrorEvent.text, "IO Error");
+		}
+
+
+		private function onClickOk():void
+		{
+			// Create Cloud Font
+			var font:CloudFont = new CloudFont();
+			font.name = Globals.GetFileName(fontLoader.source.toString());
+			this.dispatchEvent(new FontEvent('newFont', font));
+
+			PopUpManager.removePopUp(fontCreation);
+		}
+
+		private function onClickCancel():void
+		{
+			PopUpManager.removePopUp(fontCreation);
+		}
+
+	]]>
+    </mx:Script>
+
+
+	<mx:Label text="Import a TTF or SWF File to Create the Font:" />
+
+	<mx:Button id="browseBtn" label="Browse..." 
+			icon="{Globals.g_assets.AddTagIcon}"
+			click="onClickImportFont()" />
+
+	<mx:ProgressBar id="progressBar" width="100%" 
+			mode="manual"
+			label="" labelPlacement="top" 
+			enabled="true"
+			visible="false" includeInLayout="{progressBar.visible}"/>
+
+	<mx:Label id="createdFontText" text="Created Font:" visible="false" />
+	<mx:Label id="shareFontText" text="Don't forget to share this Font with other users!" 
+		fontWeight="bold" visible="false" />
+
+	<mx:SWFLoader id="fontLoader" 
+		autoLoad="true"
+		visible="false" includeInLayout="{fontLoader.visible}"
+		horizontalAlign="center"
+
+		open="onDownloadStarted(event)"
+		progress="onDownloadProgress(event)"
+		complete="onDownloadCompleted(event)"
+		httpStatus="onHttpError(event)"
+		ioError="onIOError(event)"
+		securityError="onSecurityError(event)"/>
+
+
+	<mx:ControlBar width="100%"
+		horizontalAlign="center">
+
+		<mx:Button id="okButton" label="Import" click="onClickOk()" styleName="OkButton" enabled="false" />
+		<mx:Button id="cancelButton" label="Cancel" click="onClickCancel()" styleName="CancelButton" />
+
+	</mx:ControlBar>
+
+
+</mx:TitleWindow>

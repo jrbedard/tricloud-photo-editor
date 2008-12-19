@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Image xmlns:mx="http://www.adobe.com/2006/mxml">
+
+	<mx:Script>
+    <![CDATA[
+
+		import flash.filters.*;
+		import mx.controls.Alert;
+		import mx.collections.ArrayCollection;
+
+
+		[Bindable]
+		public var imageStyle:ImageStyle = null;
+
+
+		// Put those int ImageStyle...
+
+    	[Bindable]
+		public var brightnessFilter:BitmapFilter = new ConvolutionFilter();
+
+		[Bindable]
+		public var contrastFilter:BitmapFilter = new ConvolutionFilter();
+
+		[Bindable]
+		public var hueFilter:BitmapFilter = new ConvolutionFilter();
+
+
+
+		private function GetFilter(filterName:String):BitmapFilter
+		{
+			var filter:BitmapFilter = null;
+
+			if(filterName == "brightness")
+			{
+				filter = brightnessFilter;
+			}
+			else if(filterName == "contrast")
+			{
+				filter = contrastFilter;
+			}
+			else if(filterName == "hue")
+			{
+				filter = hueFilter;
+			}
+			else
+			{
+				CloudAlert.show("Unknown filter: " + filterName, 'Filter Error');
+			}
+
+			return filter;
+		}
+		
+	
+		// Is FilterName applied to the current Cloud
+		public function IsFilterEnabled(filterName:String):Boolean
+		{
+			var filter:BitmapFilter = GetFilter(filterName);
+
+			if(filters.getItemIndex(filter) == -1) // not found
+			{
+				return false;
+			}
+			return true;
+		}
+
+
+		
+
+
+    ]]>
+    </mx:Script>
+
+
+</mx:Image>

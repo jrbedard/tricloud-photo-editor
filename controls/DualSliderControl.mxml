@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Button xmlns:mx="http://www.adobe.com/2006/mxml"
+	width="24" height="24"
+	creationComplete="onCreationComplete()">
+
+
+	<mx:Script>
+    <![CDATA[
+    	import mx.events.SliderEvent;
+
+		import mx.managers.PopUpManager;
+
+		import controls.dualSliderClasses.*;
+
+
+		private var dualSliderPanel:DualSliderPanel = new DualSliderPanel();
+		private var dualSliderPanelVisible:Boolean = false; // panel open
+
+
+
+		// Value X [0.0, 1.0]
+		public function set valueX(value:Number):void
+		{
+			dualSliderPanel.valueX = value;
+		}
+		[Bindable]
+		public function get valueX():Number
+		{
+			return dualSliderPanel.valueX;
+		}
+
+
+		// Value Y [0.0, 1.0]
+		public function set valueY(value:Number):void
+		{
+			dualSliderPanel.valueY = value;
+		}
+		[Bindable]
+		public function get valueY():Number
+		{
+			return dualSliderPanel.valueY;
+		}
+
+
+
+		private function onCreationComplete():void
+		{
+			dualSliderPanel.addEventListener("change", onSliderChange);
+
+			dualSliderPanel.addEventListener("close", onCloseDualSliderPanel);		
+		}
+
+
+		protected override function clickHandler(event:MouseEvent):void
+		{
+			event.stopPropagation(); // Dont continue click event on something below this control
+
+			if(!dualSliderPanelVisible)
+			{
+				CloudDialogManager.OpenDialog(dualSliderPanel, this);
+				dualSliderPanelVisible = true;
+
+				//fontDialog.fontGrid.selectedItem = this.selectedFont;
+
+				//this.mouseEnabled = false;
+			}
+			else
+			{
+				CloudDialogManager.CloseDialog(dualSliderPanel);
+				dualSliderPanelVisible = false;
+			}
+		}
+
+
+		private function onSliderChange(event:Event):void
+		{
+			this.dispatchEvent(new Event('change'));
+		}
+
+
+		private function onCloseDualSliderPanel(event:Event):void
+		{
+			CloudDialogManager.CloseDialog(dualSliderPanel);
+
+			dualSliderPanelVisible = false;
+			//this.mouseEnabled = true;
+		}
+
+
+
+    ]]>
+    </mx:Script>
+
+</mx:Button>

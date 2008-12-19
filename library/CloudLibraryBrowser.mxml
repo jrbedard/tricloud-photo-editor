@@ -1,0 +1,401 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:HBox xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:fc="com.adobe.flex.extras.controls.*" 
+	xmlns:cloudControls="controls.*"
+	implements="ICloudHistoryClient"
+	height="60"
+
+	horizontalGap="0"
+	verticalAlign="middle"
+	backgroundColor="#F8F8F8" backgroundAlpha="0.75"
+	borderStyle="solid" borderColor="#C0C0EE" borderThickness="1" cornerRadius="30" 
+
+	creationComplete="onCreationComplete()">
+
+
+
+	<mx:Script>
+    <![CDATA[
+
+		import mx.events.ItemClickEvent;
+
+
+		[Bindable]
+		public var browseOrSearch:uint = 1; // browse or search in the view stack
+
+		[Bindable]
+		public var searchString:String = ''; // Search text input string
+
+		[Bindable]
+		public var sortByString:String = 'name'; // Sort by name
+
+		[Bindable]
+		public var browseString:String = 'useCount'; // Browse name
+
+
+		//  ITEM TYPE
+		private var _itemType:String = CloudType.ST_IMAGE; // image, brush, shape, font, filter
+
+		public function set itemType(type:String):void
+		{
+		   _itemType = type;
+		   cloudTypeImage.source = CloudType.Icon(itemType); // change cloud Type icon
+		}
+		[Bindable]
+		public function get itemType():String
+		{
+		    return _itemType;
+		}
+
+
+		private function onCreationComplete():void
+		{
+			
+		}
+
+
+		// Save Browser state in XML
+		public virtual function Save():XML
+		{
+			var browserXML:XML = new XML("<browser></browser>");
+
+			browserXML.@browseOrSearch = browseOrSearch;
+			browserXML.@searchInput = searchInput;
+			browserXML.@sortByString = sortByString;
+			browserXML.@browseString = browseString;
+			browserXML.@itemType = itemType; 
+
+			return browserXML;
+		}
+
+
+		// Load Browser state in XML
+		public virtual function Load(browserXML:XML):void
+		{
+			if(!browserXML)
+				return;
+
+			browseOrSearch = browserXML.@browseOrSearch;
+			searchInput = browserXML.@searchInput;
+			sortByString = browserXML.@sortByString;
+			browseString = browserXML.@browseString;
+			itemType = browserXML.@itemType; 
+		}
+
+
+		// Changed the Cloud Filter
+		private function onChangeBrowseOrSearch(event:Event):void
+		{
+			browseOrSearch = libraryViewStack.selectedIndex;
+
+			LibraryHistory.action('changeBrowseOrSearch', this);
+		}
+ 
+
+		// Queries
+		// ----------------------------
+
+		// Clicked the Search button
+		public function onClickSearch():void
+		{
+			this.dispatchEvent(new CloudLibraryBrowseEvent("search", searchString, sortByString, itemType));
+		}
+
+		// Changed the SortBy comboBox
+		private function onChangeSortBy(event:Event):void
+		{
+			sortByString = sortByCombo.selectedItem.name;
+
+			LibraryHistory.action('changeSortBy', this);
+
+			onClickSearch();
+		}
+
+		// Clicked the Browse Bar
+		private function onItemClickBrowseBar(event:ItemClickEvent):void
+		{
+			browseString = event.item.name;
+
+			LibraryHistory.action('changeBrowse', this);
+
+			this.dispatchEvent(new CloudLibraryBrowseEvent("browse", "", browseString, itemType));
+		}
+
+		// Changed the Cloud Filter
+		private function onChangeTypeFilter(event:Event):void
+		{
+			itemType = cloudTypeFilter.selectedItem.type; // change itemType
+
+			LibraryHistory.action('changeFilter', this);
+
+			if(libraryViewStack.selectedIndex == 0) // Search
+			{
+				//onClickSearch();
+				this.dispatchEvent(new CloudLibraryBrowseEvent("filter", searchString, sortByString, itemType));
+			}
+			else // Browse
+			{
+				this.dispatchEvent(new CloudLibraryBrowseEvent("filter", "", browseString, itemType));
+			}
+		}
+
+
+
+		private function GetIndex(items:Array, itemName:String):int
+		{
+			var index:uint = 0;
+			for each(var item:Object in items)
+			{
+				if(itemName == item.name)
+					return index;
+
+				index++;
+			}
+			return 0;
+		}
+
+
+		private function GetCloudTypeIndex(cloudTypes:Array, itemType:String):int
+		{
+			var index:uint = 0;
+			for each(var cloudType:Object in cloudTypes)
+			{
+				if(cloudType.type == itemType)
+					return index;
+
+				index++;
+			}
+			return 0;
+		}
+
+
+		public function GetCloudType():String
+		{
+			var index:uint = GetCloudTypeIndex(cloudTypes, itemType);
+			return cloudTypes[index].label;
+		}
+
+
+	]]>
+    </mx:Script>
+
+
+
+	<mx:Style>
+
+		.BrowserButton
+		{
+			borderStyle: none;
+			backgroundAlpha: 0.5;
+			FillAphas: 0.3, 0.2;
+		}
+
+		.CloudTypeComboBoxDropDown
+		{
+			fontWeight: normal;
+			backgroundAlpha: 0.75;
+		}
+
+		.CloudTypeForm
+		{
+			indicatorGap: 5;
+			horizontalAlign: center; verticalAlign: middle;
+			horizontalGap:0; verticalGap:5;
+			paddingTop: 5; paddingLeft: 5; paddingRight: 5; paddingBottom: 5;
+		   	borderStyle: none;
+		  	dropShadowEnabled: false;
+	  	}
+
+	</mx:Style>
+
+
+
+	<!-- BROWSE/SEARCH Links -->
+	<mx:LinkBar id="browseSearchLinks" width="100"
+		direction="vertical"
+		horizontalAlign="center" verticalAlign="middle"
+		dataProvider="{this.libraryViewStack}"
+		borderStyle="none"
+		paddingLeft="0" paddingRight="0"/>
+
+
+
+	<!-- BROWSE/SEARCH View Stack -->
+	<mx:ViewStack id="libraryViewStack" width="100%" height="100%"
+		creationPolicy="all"
+		paddingTop="5" paddingLeft="5" paddingRight="5"
+		borderStyle="solid" borderColor="#C0C0EE" borderSides="left right"
+
+		selectedIndex="{this.browseOrSearch}"
+		change="onChangeBrowseOrSearch(event)">
+
+
+		<!-- SEARCH PANEL -->
+		<mx:HBox label="Search:" horizontalAlign="center" verticalAlign="middle"
+			paddingLeft="10">
+
+			<!--dataProvider="{}" labelField="cloudName, tag" -->
+			<fc:AutoComplete id="searchInput" lookAhead="false"
+				width="160"
+				keepLocalHistory="true"
+				text="{this.searchString}"
+				change="searchString = searchInput.text"
+				enter="onClickSearch()"/>
+
+			<mx:Button id="searchBtn" label="Search" click="onClickSearch()"/>
+
+			<mx:Label text="Sort by:"/>
+			<mx:ComboBox id="sortByCombo" toolTip="{sortByCombo.selectedItem.toolTip}"
+				change="onChangeSortBy(event)"
+				selectedIndex="{GetIndex(sortByTypes, sortByString)}">
+				<mx:Array id="sortByTypes">
+					<mx:Object label="Relevance"   name="name" 	    toolTip="Sort search results by relevance to cloud name and tags"/>
+					<mx:Object label="Popularity"  name="useCount"  toolTip="Sort search results by usage count"/>
+					<mx:Object label="Rating" 	   name="rating"    toolTip="Sort search results by rating"/>
+					<mx:Object label="Most Recent" name="created"   toolTip="Sort search results by date of submission"/>
+					<!--mx:Object label="Price" value="price" toolTip="Sort search results by price"/-->
+				</mx:Array>
+			</mx:ComboBox>
+
+		</mx:HBox>
+
+
+		<!-- BROWSE PANEL -->
+		<mx:ToggleButtonBar id="browseBar" label="Browse:" width="100%"
+			buttonMode="true"
+
+			buttonHeight="24"
+			horizontalGap="5" color="blue"
+			horizontalAlign="left" verticalAlign="middle"
+			buttonStyleName="BrowserButton"
+
+			selectedIndex="{GetIndex(browseTypes, browseString)}"
+			itemClick="onItemClickBrowseBar(event)">
+			<mx:Array id="browseTypes">
+				<mx:Object label="Most Popular" name="useCount"  toolTip="Browse most popular clouds" />
+				<mx:Object label="Top Rated"    name="rating" 	 toolTip="Browse top rated clouds" />
+				<mx:Object label="Most Recent"  name="created" 	 toolTip="Browse most recent clouds" />
+				<mx:Object label="My Favorite"  name="favorite"  toolTip="Browse my favorites clouds" icon="{Globals.g_assets.StarIcon}" />
+				<!--mx:Object label="Purchased" name="purchased" toolTip="" /-->
+			</mx:Array>
+		</mx:ToggleButtonBar>
+
+	</mx:ViewStack>
+
+
+
+	<!-- CLOUD TYPE SELECTION -->
+	<mx:Canvas id="cloudTypeBox" height="100%" width="150"
+		horizontalScrollPolicy="off" verticalScrollPolicy="off"
+		borderStyle="none">
+
+		<mx:Image id="cloudTypeImage" width="42" height="42" 
+			x="46" y="10"
+			alpha="0.25"
+			source="{CloudType.Icon(itemType)}"/>
+
+		<mx:ComboBox id="cloudTypeFilter" 
+			x="18" y="18"
+			toolTip="{cloudTypeFilter.selectedItem.toolTip}" 
+			fillAlphas="[0.3,0.1]" alpha="0.8" textAlign="center"
+			dropDownStyleName="CloudTypeComboBoxDropDown"
+			rowCount="6"
+			selectedIndex="{GetCloudTypeIndex(cloudTypes, itemType)}"
+			change="onChangeTypeFilter(event)">
+			<mx:Array id="cloudTypes">
+				<mx:Object label="Images" type="{CloudType.ST_IMAGE}" icon="{CloudType.Icon(CloudType.ST_IMAGE)}" toolTip="Show only Images"/>
+				<mx:Object label="Fonts" type="{CloudType.ST_FONT}" icon="{CloudType.Icon(CloudType.ST_FONT)}" toolTip="Show only Fonts"/>
+				<mx:Object label="Brushes" type="{CloudType.ST_BRUSH}" icon="{CloudType.Icon(CloudType.ST_BRUSH)}" toolTip="Show only Brushes"/>
+				<mx:Object label="Shapes" type="{CloudType.ST_SHAPE}" icon="{CloudType.Icon(CloudType.ST_SHAPE)}" toolTip="Show only Shapes"/>
+				<mx:Object label="Gradients" type="{CloudType.ST_GRADIENT}" icon="{CloudType.Icon(CloudType.ST_GRADIENT)}" toolTip="Show only Gradients"/>
+				<mx:Object label="Effects" type="{CloudType.ST_EFFECT}" icon="{CloudType.Icon(CloudType.ST_EFFECT)}" toolTip="Show only Effects"/>
+			</mx:Array>
+		</mx:ComboBox>
+
+
+		<!-- CLOUD TYPE  ADVANCED VIEWSTACK -->
+		<mx:ViewStack id="cloudTypeViewStack" width="100%"
+			x="0" y="60"
+			includeInLayout="false" visible="{this.cloudTypeViewStack.includeInLayout}"
+			borderStyle="solid" borderSides="top"
+			creationPolicy="auto" resizeToContent="true"
+			selectedIndex="0">
+
+			<!-- IMAGE -->
+			<mx:Form id="imageInfo" label="Image" name="image"
+				styleName="CloudTypeForm">
+				<mx:FormItem label="Size:">
+					<mx:ComboBox id="imageSizeCombo" width="80"
+						toolTip="Select wanted Image Size">
+						<mx:Array id="imageSizes">
+							<mx:Object label="any" name="any" />
+							<mx:Object label="small" name="small" />
+							<mx:Object label="medium" name="medium" />
+							<mx:Object label="large" name="large" />
+						</mx:Array>
+					</mx:ComboBox>
+				</mx:FormItem>
+
+				<mx:FormItem label="Color:">
+					<mx:RadioButton label="any"/>
+					<mx:RadioButton label="specific:"/>
+						<cloudControls:ColorControl id="imageColor"
+							width="32" height="32" 
+							title="Search by Color"
+						 	toolTip="Select the Color"
+						 	selectedColor="0xFF0000"
+						 	selectedAlpha="1.0"
+						 	gradientEnabled="false"/>
+				</mx:FormItem>
+
+			</mx:Form>
+
+			<!-- FONT -->
+			<mx:Form id="fontInfo" label="Font" name="font"
+				styleName="CloudInfoForm">
+
+				<mx:FormItem label="Style:">
+					<mx:ComboBox id="fontStyleCombo" width="80"
+						toolTip="Select wanted Font Style">
+						<mx:Array id="fontStyles">
+							<mx:Object label="any" name="any" />
+							<mx:Object label="has bold" name="bold" />
+							<mx:Object label="has italic" name="italic" />
+							<mx:Object label="has bold and italic" name="both" />
+						</mx:Array>
+					</mx:ComboBox>
+				</mx:FormItem>
+
+			</mx:Form>
+		</mx:ViewStack>
+
+	</mx:Canvas>
+
+
+
+	<mx:states>
+		<mx:State name="normal">
+			<mx:SetProperty target="{this}" name="height" value="60" />
+			<mx:SetProperty target="{this.cloudTypeViewStack}" name="includeInLayout" value="false" />
+		</mx:State>
+
+		<mx:State name="advanced">
+			<mx:SetProperty target="{this}" name="height" value="160" />
+			<mx:SetProperty target="{this.cloudTypeViewStack}" name="includeInLayout" value="true" />
+		</mx:State>
+	</mx:states>
+
+
+	<mx:transitions>
+		<mx:Transition fromState="normal" toState="advanced">
+			<mx:Resize target="{this}" heightFrom="60" heightTo="160" duration="250"
+				suspendBackgroundProcessing="true" />
+		</mx:Transition>
+
+		<mx:Transition fromState="advanced" toState="normal">
+			<mx:Resize target="{this}" heightFrom="160" heightTo="60" duration="250" 
+				suspendBackgroundProcessing="true"/>
+		</mx:Transition>
+	</mx:transitions>
+	
+
+</mx:HBox>

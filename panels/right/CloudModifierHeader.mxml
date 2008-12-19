@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:CheckBox xmlns:mx="http://www.adobe.com/2006/mxml"
+
+	 color="0x4f4f4f" borderColor="0x4f0000"
+	 paddingBottom="2" paddingLeft="2" paddingRight="2" paddingTop="2"
+
+	 creationComplete="onCreationComplete()">
+
+
+	<mx:Script>
+	<![CDATA[
+
+		import mx.containers.Accordion;
+
+		
+		private var parentAcc:Accordion = null;
+		private var collapseIndex:int;
+
+
+		public var remoteSelect:Boolean = false; // called according to Cloud.CloudFilters state
+		private var localSelect:Boolean = false; // called locally by clicking on the checkbox
+
+
+		private function onCreationComplete():void
+		{
+			parentAcc = Accordion(this.parent);
+			collapseIndex = parentAcc.numChildren-1;
+		}
+
+
+		protected override function clickHandler(event:MouseEvent):void
+		{
+			// Detect if we clicked on the checkbox or the rest of the button
+			if(event.localX >= 1 && event.localX <= 16 &&
+			   event.localY >= 1 && event.localY <= 16)
+			{
+				this.localSelect = true;
+				super.clickHandler(event); // this.selected [true or false]
+
+				//parentAcc.getHeaderAt();
+
+				// TODO : if we unchecked and panel not opened, dont open it
+				// TODO : if we unchecked and panel opened, collapse
+			}
+			else
+			{
+				// if panel already opened, then collapse...
+				parentAcc.selectedIndex = collapseIndex;
+			}
+		}
+
+
+		public override function set selected(value:Boolean):void
+		{
+			if(localSelect || remoteSelect)
+			{
+				super.selected = value;
+
+				// the checkbox was checked or unchecked
+				CloudModifiersPanel(this.parentDocument).EnableModifier(this.label, value);
+
+				if(!value) // if unchecked than collapse...
+				{
+					//parentAcc.selectedIndex = collapseIndex;
+				}
+
+				localSelect = false;
+				remoteSelect = false;
+			}
+		}
+
+	]]>
+	</mx:Script>
+
+
+</mx:CheckBox>

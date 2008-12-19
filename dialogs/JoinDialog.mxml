@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:cloudPanels="panels.*"
+	width="400" height="300"
+	titleIcon="{Globals.g_assets.ImageImporter}"
+	title="Join TriCloud"
+	layout="vertical"
+	horizontalScrollPolicy="off" verticalScrollPolicy="off"
+	showCloseButton="true"
+
+	styleName="CloudDialog"
+	titleStyleName="CloudDialogTitle"
+	horizontalAlign="center" verticalAlign="middle"
+
+	creationComplete="onCreationComplete()">
+
+
+	<mx:Script>
+    <![CDATA[
+
+		import mx.events.CloseEvent;
+		import mx.managers.PopUpManager;
+
+		import session.LoginDialog;
+
+
+		// Static instance, singleton
+		public static const joinDialog:JoinDialog = new JoinDialog();
+
+		private var loginDialog:LoginDialog = LoginDialog.loginDialog;
+
+
+		private function onCreationComplete():void
+    	{
+			// Set the Right Click menu for this Dialog
+   			var rightClickMenu:RightClickMenu = new RightClickMenu(this.title);
+   			this.contextMenu = rightClickMenu.triCloudContextMenu;
+    	}
+
+		private function onClickLogin():void
+		{
+			onClickOk(); // Close
+			// Open Login Dialog
+			PopUpManager.addPopUp(loginDialog, this.parentApplication as DisplayObject, true);
+			PopUpManager.centerPopUp(loginDialog); // Center Login dialog
+		}
+
+
+		private function onClickOk():void
+		{
+			this.dispatchEvent(new Event('close'));	
+		}
+
+ 	]]>
+    </mx:Script>
+
+
+	<!-- JOIN TRICLOUD -->
+
+	<mx:Label text="Sorry, This feature is only available for Registered Users!" 
+		 fontSize="12"/>
+	<mx:Label text="Joining TriCloud is Quick, Easy and Free!" 
+		fontSize="12" fontWeight="bold"/>
+
+	<mx:LinkButton label="Join TriCloud Now!" click="navigateToURL(new URLRequest('/join'), 'TriCloud');" 
+		toolTip="Join TriCloud Now!"
+		fontSize="16"/>
+
+	<mx:HBox horizontalGap="0" verticalAlign="middle">
+		<mx:Label text="If you are already a member," />
+		<mx:LinkButton label="Login Here" click="onClickLogin()" />
+	</mx:HBox>
+
+    <mx:ControlBar>
+		<mx:Button id="okButton" label="Ok" click="onClickOk()" styleName="OkButton" />		
+	</mx:ControlBar>
+    
+</mx:TitleWindow>

@@ -1,0 +1,574 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:cloudControls="controls.*"
+	width="100%" height="100%"
+	currentState="{GradientType.LINEAR}"
+
+	verticalGap="10"
+	horizontalAlign="left" verticalAlign="top"
+
+	creationComplete="onCreationComplete()">
+
+
+	<mx:Script>
+    <![CDATA[
+
+    	import flash.display.GradientType;
+		import flash.display.SpreadMethod;
+		import flash.display.InterpolationMethod;
+		import mx.controls.Alert;
+		import mx.collections.ArrayCollection;
+		import mx.controls.TileList;
+    	import mx.events.ItemClickEvent;
+    	import mx.events.SliderEvent;
+    	import mx.rpc.events.AbstractEvent;
+    	import mx.graphics.GradientEntry;
+    	import mx.graphics.Stroke;
+
+		import help.AboutDialog;
+		import library.CloudLibraryBrowseEvent;
+		import share.ShareController;
+
+
+		// CheckerBoard background
+		private var backgroundBmp:Bitmap = new Globals.g_assets.ColorControlBackground as Bitmap;
+		private var backgroundMatrix:Matrix = new Matrix();
+
+
+		[Bindable]
+		private var selectedGradient:CloudGradient = new CloudGradient(); // selected Gradient
+		private var gradientMatrix:Matrix = new Matrix();
+
+		private var selectedThumbIndex:uint = 0;  // last selected thumb on the gradientSlider
+
+
+
+		private function onCreationComplete():void
+		{
+			// Listen for selected gradient change in the list
+			this.parentDocument.addEventListener("gradientChange", onGradientSelChange);
+
+			this.addEventListener('gradientThumbChange', onGradientThumbChange); // Thumb's Color or Alpha changed
+
+			// Dont Update gradient bar until opening the control
+		}
+
+
+		// The gradient selected in the gradient list just changed
+		private function onGradientSelChange(event:GradientEvent):void
+		{
+			selectedGradient = event.gradient;
+			UpdateGradient();
+			UpdateGradientThumbs();
+		}
+
+
+		// Changed Gradient thumb ratio value by sliding
+		private function onChangeGradientSlider(event:SliderEvent):void
+		{
+			selectedGradient.ratios[event.thumbIndex] = event.value / gradientSlider.maximum * 255;
+			UpdateGradient();
+		}
+
+		// Changed thumb color or alpha 
+		private function onGradientThumbChange(event:ColorEvent):void
+		{
+			selectedGradient.colors[selectedThumbIndex] = event.color;
+			selectedGradient.alphas[selectedThumbIndex] = event.alpha;
+			UpdateGradient();
+		}
+
+
+
+		// Update Gradient
+		private function UpdateGradient():void
+		{
+			if(!selectedGradient)
+				return;
+
+			UpdateGradientBar();
+
+			// Dispatch the event that the selected gradient changed
+			ColorDialog(this.parentDocument).dispatchEvent(new GradientEvent("gradientParamChange", selectedGradient));
+		}
+
+
+		private function SelectGradientThumb():void
+		{
+			for(var i:uint = 0; i < selectedGradient.ratios.length; ++i) // For each Gradient Thumb
+			{
+				if(!GetGradientThumb(i))
+				{
+					trace('Gradient thumb ' + i + ' doesnt exist');
+					continue;	
+				}
+
+				if(i == selectedThumbIndex) // Selected Thumb
+				{
+					GetGradientThumb(i).curSelected = true;
+				}
+				else // Not selected Thumb
+				{
+					GetGradientThumb(i).curSelected = false;
+				}
+			}
+		}
+
+
+
+		// Update gradient slider
+		private function UpdateGradientThumbs():void
+		{
+			if(!selectedGradient)
+				return;
+
+			if((selectedGradient.ratios.length != selectedGradient.colors.length) ||
+				selectedGradient.ratios.length != selectedGradient.alphas.length)
+			{
+				CloudAlert.show('Invalid Gradient!', 'Gradient');
+				return;
+			}
+
+/*
+			if(gradientSlider.thumbCount != selectedGradient.ratios.length || 
+			   !GetGradientThumb(gradientSlider.thumbCount-1))
+			{
+				CloudAlert.show('Wrong amount of Thumbs for Gradient!');
+				return;
+			}
+*/
+			gradientSlider.thumbCount = selectedGradient.ratios.length;
+
+
+			for(var i:uint = 0; i < selectedGradient.ratios.length; ++i) // For each Gradient Entry
+			{
+				if(!GetGradientThumb(i))
+				{
+					trace('Gradient thumb ' + i + ' doesnt exist');
+					continue;	
+				}
+
+				// update Gradient SLIDER (x = [12, 259]) FUDGED values, to be changed if the gradientSlider's width change
+				GetGradientThumb(i).x = (selectedGradient.ratios[i] / 255) * 247 + 12;
+				//var test:Number = GetGradientThumb(i).x;
+				GetGradientThumb(i).selectedColor = selectedGradient.colors[i];
+				GetGradientThumb(i).selectedAlpha = selectedGradient.alphas[i];
+			}
+		}
+
+
+		// Render Gradient Bar
+		private function UpdateGradientBar():void
+		{
+			if(!selectedGradient)
+				return;
+
+			if(this.currentState != selectedGradient.gradientType)
+			{
+				this.setCurrentState(selectedGradient.gradientType);	
+			}
+
+			// update Gradient BAR/BOX
+			gradientBar.graphics.clear();
+			gradientBar.graphics.lineStyle(1, 0x000000, 1.0);
+
+			backgroundMatrix.createGradientBox(backgroundBmp.width, backgroundBmp.height, 0.0, 0, 0);
+
+			// Background Bitmap fill
+			gradientBar.graphics.beginBitmapFill(backgroundBmp.bitmapData, backgroundMatrix, true, false);
+			gradientBar.graphics.drawRect(0,0, gradientBar.width, gradientBar.height);
+			gradientBar.graphics.endFill();
+
+			// Dont rotate
+			var radVal:Number = 0.0; //gradientAngle.value / 180.0 * Math.PI;
+			gradientMatrix.createGradientBox(gradientBar.width, gradientBar.height, radVal, 0, 0);
+
+			// Gradient fill
+			gradientBar.graphics.beginGradientFill(selectedGradient.gradientType, 
+												   selectedGradient.colors,
+												   selectedGradient.alphas,
+												   selectedGradient.ratios,
+												   gradientMatrix,
+												   selectedGradient.spreadMethod);
+
+			gradientBar.graphics.drawRect(0,0, gradientBar.width, gradientBar.height);
+			gradientBar.graphics.endFill();
+		}
+
+
+
+
+		// Get GradientThumb
+		private function GetGradientThumb(index:uint):GradientThumb
+		{
+			return GradientThumb(gradientSlider.getThumbAt(index));
+		}
+
+		private function dataTipFunc(val:String):String
+		{
+			return val + "%";
+		}
+
+
+		private function onThumbDrag(event:SliderEvent):void
+		{
+			return; // not now
+			
+			var selIndex:uint = event.thumbIndex;
+			var selThumb:GradientThumb = GetGradientThumb(selIndex);
+			if(!selThumb)
+				return;
+
+			// Index swapping
+			for(var t:uint = 0; t < gradientSlider.thumbCount; ++t) // For each Gradient Entry
+			{
+				if(t == selIndex)
+					continue;
+
+				var gradientThumb:GradientThumb = GetGradientThumb(t);
+				if(!gradientThumb)
+					continue;
+
+				if(selThumb.x < gradientThumb.x && // selGradient has a smaller ratio
+				   selIndex > t) // but bigger index
+				{
+					swapGradients(t, selIndex);
+				}
+			}
+		}
+
+		private function onThumbRelease(event:SliderEvent):void
+		{
+			
+		}
+
+
+		// PERIOUS GRADIENT SWAPING !
+		private function swapGradients(index1:uint, index2:uint):void
+		{
+			if(!selectedGradient)
+				return;
+
+			if(index1 == index2)
+				return;
+
+			// SWAP ratio, color and alpha
+			var tempRatio:uint = selectedGradient.ratios[index1];
+			var tempColor:uint = selectedGradient.colors[index1];
+			var tempAlpha:Number = selectedGradient.alphas[index1];
+
+			selectedGradient.ratios[index1] = selectedGradient.ratios[index2];
+			selectedGradient.colors[index1] = selectedGradient.colors[index2];
+			selectedGradient.alphas[index1] = selectedGradient.alphas[index2];
+
+			selectedGradient.ratios[index2] = tempRatio;
+			selectedGradient.colors[index2] = tempColor;
+			selectedGradient.alphas[index2] = tempAlpha;
+
+			// Swap thumb indexes
+			//selThumb.set
+			//gradientSlider.setChildIndex();
+		}
+
+
+
+		// ADD and REMOVE Thumb
+		// ----------------------------------------
+
+		private function onItemClickThumbCtl(event:ItemClickEvent):void
+		{
+			if(event.item.name == 'new') // New gradient thumb
+			{
+				NewGradientThumb();
+			}
+			else if(event.item.name == 'edit') // Edit gradient thumb
+			{
+				EditGradientThumb();
+			}
+			else if(event.item.name == 'delete') // Delete gradient thumb
+			{
+				DeleteGradientThumb();
+			}
+		}
+
+
+		// Add new Gradient thumb
+		private function NewGradientThumb():void
+		{
+			if(gradientSlider.thumbCount >= 16)
+			{
+				CloudAlert.show('Gradient has a maximum of 16 entries.', 'Gradient');
+				return;
+			}
+
+			// Add Gradient Entry
+			selectedGradient.ratios.push(255);
+			selectedGradient.colors.push(0x000000);
+			selectedGradient.alphas.push(1.0);
+
+			gradientSlider.thumbCount++; // Add thumb
+
+			// Select the new Thumb
+			selectedThumbIndex = gradientSlider.thumbCount-1;
+
+			// Wait until the slider thumb is really added to update all thumbs
+			gradientSlider.addEventListener('updateComplete', onThumbCountUpdated);
+		}
+
+
+		// Edit selected gradient thumb
+		private function EditGradientThumb():void
+		{
+			if(!selectedGradient)
+				return;
+
+			var selThumb:GradientThumb = GetGradientThumb(selectedThumbIndex);
+			selThumb.OpenColorDialog();
+		}
+
+
+		// Remove selected gradient thumb
+		private function DeleteGradientThumb():void
+		{
+			if(!selectedGradient)
+				return;
+
+			if(gradientSlider.thumbCount <= 2)
+			{
+				CloudAlert.show(' A Gradient must have at least 2 entries.', 'Gradient');
+				return;
+			}
+
+			// Swap Selected thumb with the last one and delete
+			swapGradients(selectedThumbIndex ,gradientSlider.thumbCount-1)
+
+			gradientSlider.thumbCount--; // Remove Last thumb
+
+			// remove those... how?
+			//selectedGradient.ratios.pop(); //[selectedThumbIndex];
+			//selectedGradient.colors.pop(); //[selectedThumbIndex];
+			//selectedGradient.alphas.pop(); //[selectedThumbIndex];
+
+			// Select the last thumb
+			selectedThumbIndex = gradientSlider.thumbCount-1;
+
+			// Wait until the slider thumb is really removed to update all thumbs
+			gradientSlider.addEventListener('updateComplete', onThumbCountUpdated);
+		}
+
+
+		// A gradient thumb was added or removed
+		private function onThumbCountUpdated(event:Event):void
+		{
+			gradientSlider.removeEventListener('updateComplete', onThumbCountUpdated);
+			UpdateGradientThumbs();
+
+			// Select thumb
+			SelectGradientThumb();
+		}
+
+
+
+		private function GetIndex(items:Array, itemName:String):int
+		{
+			var index:uint = 0;
+			for each(var item:Object in items)
+			{
+				if(itemName == item.name)
+					return index;
+
+				index++;
+			}
+			return 0;
+		}
+
+
+		// Browse Library for gradient
+		private function onClickBrowseGradient():void
+		{
+			// Open the Cloud Library to browse/search for Gradients
+			TriCloud(this.parentApplication).dispatchEvent(
+				new CloudLibraryBrowseEvent("browseCloudLibrary", '', "useCount", CloudType.ST_GRADIENT));
+		}
+
+		// Share that gradient?!
+		private function onClickShareGradient():void
+		{
+			// Generate Gradient Bitmap Icon
+			var bmpData:BitmapData = new BitmapData(gradientBar.width, gradientBar.height, true, 0);
+
+			var iconMatrix:Matrix = new Matrix();
+			bmpData.draw(gradientBar, iconMatrix);
+
+			// Save Bitmap
+			selectedGradient.iconBitmap = new Bitmap(bmpData, "auto", false);
+
+			var shareController:ShareController = CloudEngine.GetInstance().GetShareController();
+			shareController.ShareCloud(selectedGradient, CloudType.ST_GRADIENT);
+
+			// Close Color Dialog
+			this.dispatchEvent(new Event("close", true));
+		}
+
+
+	 ]]>
+    </mx:Script>
+
+
+	<mx:VBox id="gradientBox" width="100%" 
+		horizontalAlign="center" verticalAlign="middle"
+		paddingTop="10">
+
+		<!-- GRADIENT BAR -->
+		<mx:Box id="gradientBar" width="270" height="30"/>
+
+	</mx:VBox>
+
+
+	<mx:VBox id="sliderBox" width="100%" 
+		horizontalAlign="center" verticalAlign="middle"
+		borderStyle="solid" borderThickness="1" borderColor="0xC0C0C0"
+		paddingBottom="5">
+
+		<!-- GRADIENT SLIDER -->
+		<mx:HSlider id="gradientSlider" width="270"
+			minimum="0" maximum="100"
+			liveDragging="true" snapInterval="1"
+			tickInterval="5" tickColor="0x000000" tickThickness="1"
+			labels="['0%','50%','100%']"
+
+			sliderThumbClass="controls.colorClasses.GradientThumb"
+			thumbCount="2"
+			allowThumbOverlap="true" allowTrackClick="false"
+
+			toolTip="Adjust Gradient ratio"
+			dataTipOffset="3"
+			dataTipFormatFunction="dataTipFunc"
+ 
+			change="onChangeGradientSlider(event);"
+			thumbPress="selectedThumbIndex = event.thumbIndex;
+						SelectGradientThumb();"
+			thumbDrag="onThumbDrag(event);"
+			thumbRelease="onThumbRelease(event);"/>
+
+
+			<!-- THUMB CONTROL -->
+			<mx:ButtonBar id="thumbControl" paddingTop="20" direction="horizontal"
+				 buttonWidth="28"
+				 itemClick="onItemClickThumbCtl(event)">
+					<mx:Object name="new" icon="{Globals.g_assets.newThumbIcon}" toolTip="Add new gradient slider" />
+					<mx:Object name="edit" icon="{Globals.g_assets.editThumbIcon}" toolTip="Edit selected gradient slider" />
+					<mx:Object name="delete" icon="{Globals.g_assets.deleteThumbIcon}" toolTip="Delete selected gradient slider" />
+			</mx:ButtonBar>
+
+	</mx:VBox>
+
+
+
+
+	<mx:Form id="configurationBox" width="100%" 
+		 borderStyle="solid" borderThickness="1" borderColor="0xC0C0C0"
+		 verticalGap="10">
+
+		<!-- GRADIENT TYPE -->
+		<mx:FormItem label="Gradient Type:">
+			<mx:ComboBox id="gradientTypeBtn"
+				selectedIndex="{GetIndex(gradientTypes, selectedGradient.gradientType)}"
+				change="selectedGradient.gradientType = gradientTypeBtn.selectedItem.name;
+						UpdateGradient();">
+	 			<mx:Array id="gradientTypes">
+	 				<mx:Object name="{GradientType.LINEAR}" label="{GradientType.LINEAR}" toolTip="Linear Gradient" />
+					<mx:Object name="{GradientType.RADIAL}" label="{GradientType.RADIAL}" toolTip="Radial Gradient" />
+				</mx:Array>
+			</mx:ComboBox>
+		</mx:FormItem>
+
+
+		<!-- GRADIENT ANGLE -->
+		<mx:FormItem label="Angle:">
+			<cloudControls:AngleControl id="gradientAngle"
+				value="{selectedGradient.rotation / Math.PI * 180.0}"
+				change="selectedGradient.rotation = (gradientAngle.value / 180.0 * Math.PI);
+						UpdateGradient();"/>
+		</mx:FormItem>
+
+
+		<!-- SPREAD METHOD -->
+		<mx:FormItem label="Spread:">
+			<mx:ComboBox id="spreadMethodBtn"
+				selectedIndex="{GetIndex(spreadMethods, selectedGradient.spreadMethod)}"
+				change="selectedGradient.spreadMethod = spreadMethodBtn.selectedItem.name;
+						UpdateGradient();">
+				<mx:Array id="spreadMethods">
+					<mx:Object name="{SpreadMethod.PAD}" label="{SpreadMethod.PAD}" toolTip="Pad Spread method" />
+			 		<mx:Object name="{SpreadMethod.REFLECT}" label="{SpreadMethod.REFLECT}" toolTip="Reflect Spread method" />
+			 		<mx:Object name="{SpreadMethod.REPEAT}" label="{SpreadMethod.REPEAT}" toolTip="Repeat Spread method" />
+				</mx:Array>
+			</mx:ComboBox>
+		</mx:FormItem>
+
+
+		<!-- INTERPOLATION METHOD -->
+		<mx:FormItem label="Interpolation:">
+			<mx:ComboBox id="interpMethodBtn" 
+				selectedIndex="{GetIndex(interpMethods, selectedGradient.interpolationMethod)}"
+				change="selectedGradient.interpolationMethod = interpMethodBtn.selectedItem.name;
+					    UpdateGradient();">
+				<mx:Array id="interpMethods">
+					<mx:Object name="{InterpolationMethod.RGB}" label="{InterpolationMethod.RGB}" toolTip="RGB Interpolation method" />
+					<mx:Object name="{InterpolationMethod.LINEAR_RGB}" label="{InterpolationMethod.LINEAR_RGB}" toolTip="Linear RGB Interpolation method" />
+				</mx:Array>
+			</mx:ComboBox>
+		</mx:FormItem>
+
+
+		<!-- FOCAL POINT RATIO -->
+		<mx:FormItem label="Focal Point Ratio:">
+		<mx:NumericStepper id="focalPointCtl" maxChars="3" minimum="-1.0" maximum="1.0" stepSize="0.1" width="55"
+			value="{selectedGradient.focalPointRatio}"
+			change="selectedGradient.focalPointRatio = event.value;
+					UpdateGradient();"/>
+		</mx:FormItem>
+
+	</mx:Form>
+
+
+	<mx:HBox horizontalGap="0" verticalAlign="middle">
+		<mx:Button id="browseGradientBtn" icon="{Globals.g_assets.TriCloudIcon16}" 
+			toolTip="Browse/Search Gradients in the Cloud Library"
+			click="onClickBrowseGradient()"/>
+
+		<mx:Button id="shareGradientBtn" icon="{Globals.g_assets.ShareIcon}"
+			toolTip="Share This Gradient"
+			click="onClickShareGradient(); // Dislpay Button only if Gradient's remoteID == '0'"/>
+	</mx:HBox>
+
+
+
+	<mx:states>
+		<mx:State name="{GradientType.LINEAR}">
+			<mx:SetProperty target="{gradientBar}" name="width" value="270" />
+			<mx:SetProperty target="{gradientBar}" name="height" value="30" />
+		</mx:State>
+
+		<mx:State name="{GradientType.RADIAL}">
+			<mx:SetProperty target="{gradientBar}" name="width" value="150" />
+			<mx:SetProperty target="{gradientBar}" name="height" value="150" />
+		</mx:State>
+	</mx:states>
+
+
+	<!--mx:transitions>
+		<mx:Transition fromState="{GradientType.LINEAR}" toState="{GradientType.RADIAL}">
+			<mx:Resize target="{gradientBar}" widthFrom="270" heightFrom="30" widthTo="150" heightTo="150" duration="200"
+				suspendBackgroundProcessing="true"/>
+		</mx:Transition>
+
+		<mx:Transition fromState="{GradientType.RADIAL}" toState="{GradientType.LINEAR}">
+			<mx:Resize target="{gradientBar}" widthFrom="150" heightFrom="150" widthTo="270" heightTo="30" duration="200"
+				suspendBackgroundProcessing="true"/>
+		</mx:Transition>	
+	</mx:transitions-->
+
+
+
+</mx:VBox>

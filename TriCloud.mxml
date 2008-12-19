@@ -1,0 +1,437 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Application xmlns:mx="http://www.adobe.com/2006/mxml" xmlns="*" xmlns:assets="assets.*" xmlns:controllers="controllers.*" 
+	xmlns:panels="panels.*" xmlns:leftPanels="panels.left.*" xmlns:rightPanels="panels.right.*" 
+	xmlns:centerPanels="panels.center.*" xmlns:library="library.*" xmlns:cloudPanels="panels.*"
+    usePreloader="true" preloader="TriCloudLoader"
+    width="100%" height="100%"
+    layout="vertical"
+    autoLayout="true"
+    currentState="cloudDesign"
+	frameRate="60"
+    verticalScrollPolicy="off" horizontalScrollPolicy="off"
+    backgroundColor="0xFFFFFF"
+ 
+	initialize="onInitialize()"
+	creationComplete="onCreationComplete()"
+	rollOver="onRollOverApp(event)" 
+	rollOut="onRollOutApp(event)"
+	keyDown="onKeyDown(event)">
+
+
+    <mx:Script>
+    <![CDATA[
+    	import flash.profiler.profile;
+    	import mx.containers.Canvas;
+    	import mx.containers.Panel;
+		import mx.controls.Alert;
+		import mx.core.UIComponent;
+		import mx.events.DividerEvent;
+		import mx.events.TweenEvent;
+		import mx.binding.utils.*;
+		import mx.managers.CursorManager;
+		import mx.managers.SystemManager;
+		import mx.managers.PopUpManager;
+
+		import bridge.FABridge;
+
+        import core.CanvasController;
+        import core.CloudController;
+        import RightClickMenu;
+		import CloudEngine;
+
+        import assets.*;
+        import library.CloudLibraryBrowseEvent;
+
+
+
+		private function onInitialize():void
+		{
+			// profiler
+			//flash.profiler.profile(true);
+			//flash.profiler.heapDump
+
+			// Alert Styles
+		}
+
+
+    	private function onCreationComplete():void
+   		{
+			CloudEngine.GetInstance(); // Create the cloud Engine
+
+			centerPanel.init(); // Create center panel before side panels
+			leftPanel.init();
+   			rightPanel.init();
+
+			// Set the Right Click menu for the TriCloud Editor
+   			var rightClickMenu:RightClickMenu = new RightClickMenu("TriCloud");
+   			this.contextMenu = rightClickMenu.triCloudContextMenu;
+
+			//this.stage.showDefaultContextMenu = false;
+			//this.stage.contextMenu = rightClickMenu.triCloudContextMenu;
+
+
+   			//http://www.morearty.com/blog/2006/07/17/flex-tip-a-higher-frame-rate-even-makes-text-entry-look-better/
+   			BindingUtils.bindSetter(onFrameRateChange, this.stage, 'frameRate');
+
+			// Events from Design view to open the CloudLibrary to browse for...
+			this.addEventListener('browseCloudLibrary', onBrowseCloudLibrary);
+   		}
+
+
+		// Open Cloud Library to Browse/Search for....
+		private function onBrowseCloudLibrary(event:CloudLibraryBrowseEvent):void
+		{
+			this.setCurrentState('cloudLibrary');
+
+			var browseEvent:CloudLibraryBrowseEvent = 
+				new CloudLibraryBrowseEvent("browse", '', event.sortBy, event.itemType);
+
+			leftPanel.cloudLibraryPanel.cloudLibraryBrowser.browseString = event.sortBy;
+			leftPanel.cloudLibraryPanel.cloudLibraryBrowser.itemType = event.itemType;
+			leftPanel.cloudLibraryPanel.cloudLibraryBrowser.dispatchEvent(browseEvent);
+		}
+
+
+
+		private function onRollOverApp(event:MouseEvent):void
+		{
+			//CursorManager.showCursor();
+		}
+
+		private function onRollOutApp(event:MouseEvent):void
+		{
+			//CursorManager.hideCursor();
+		}
+
+
+		private function onFrameRateChange(fps:Number):void
+		{
+			//frameRateLabel.text = fps.toString();//
+		}
+
+
+
+		private function onDividerDrag(event:DividerEvent):void
+		{
+			if(this.currentState == "cloudLibrary") // draging center/right and current state = cloudLibrary
+			{
+				//mainHDivider.moveDivider((event.dividerIndex == 0)?1:0, mainHDivider.getDividerAt(event.dividerIndex));
+			}
+		}
+
+
+		private var oldDivider0X:uint = 0;
+		private var oldDivider1X:uint = 0;
+
+
+		private function onDoubleClickDivider(event:MouseEvent):void
+		{
+ 
+			//fudged way to know which divider was double clicked
+			if(event.stageX >= mainHDivider.getDividerAt(0).x &&
+			   event.stageX < mainHDivider.getDividerAt(0).x + 16)
+			{
+				if(mainHDivider.getDividerAt(0).x <= 10) // expand divider 0
+				{
+					mainHDivider.moveDivider(0, oldDivider0X);
+					return;
+				}
+
+				oldDivider0X = mainHDivider.getDividerAt(0).x;
+
+				// collapse divider 0
+				mainHDivider.moveDivider(0, -mainHDivider.getDividerAt(0).x);
+			}
+			else if(event.stageX >= mainHDivider.getDividerAt(1).x &&
+					event.stageX < mainHDivider.getDividerAt(1).x + 16)
+			{
+				if(mainHDivider.getDividerAt(1).x >= (this.width - 32)) // expand divider 1
+				{
+					mainHDivider.moveDivider(1, oldDivider1X);
+					return;
+				}
+
+				oldDivider1X = mainHDivider.getDividerAt(1).x;
+
+				// collapse divider 1
+				mainHDivider.moveDivider(1, mainHDivider.getDividerAt(1).x +  mainHDivider.getDividerAt(1).width);
+			}
+		}
+
+
+		private var oldLeftPaneWidth:int;
+		private var oldRightPaneWidth:int;
+
+
+		// My Clouds -> Cloud Library
+		private function onEnterStateCL():void
+		{
+			oldLeftPaneWidth = leftPanel.width;
+			oldRightPaneWidth = rightPanel.width;
+
+			mainHDivider.moveDivider(0, (rightPanel.x - 18) - mainHDivider.getDividerAt(0).x);
+
+			leftPanel.leftViewStack.selectedIndex = 1;
+
+			rightPanel.rightViewStack.selectedIndex = 1;
+
+			CloudCursor.SetCursor(CloudCursor.NORMAL); // normal cursor
+
+			CloudDialogManager.HideAllDialog(); // Restore hidden dialogs
+		}
+
+		private function onTweenUpdateToCloudLibrary(event:TweenEvent):void
+		{
+			mainHDivider.moveDivider(0, 1);
+		}
+		
+
+		// Cloud Library -> My Clouds
+		private function onExitStateCL():void
+		{
+			// todo : animate this
+			mainHDivider.moveDivider(0, -leftPanel.width + oldLeftPaneWidth);
+
+			leftPanel.leftViewStack.selectedIndex = 0;
+
+			rightPanel.rightViewStack.selectedIndex = 0;
+			rightPanel.width = oldRightPaneWidth;
+
+			CloudCursor.SetCursor(CloudCursor.NORMAL); // normal cursor
+
+			CloudDialogManager.ShowAllDialog(); // Restore hidden dialogs
+		}
+
+
+
+
+		[Bindable]
+		private var timerVal:Number = 0;
+
+	 	override protected function updateDisplayList(unscaledWidth:Number, unscaledHeight:Number):void
+        {
+            super.updateDisplayList(unscaledWidth, unscaledHeight);
+
+			//timerVal = getTimer();
+		}
+
+
+		private function onKeyDown(event:KeyboardEvent):void
+		{
+			if(event.ctrlKey)
+			{
+			
+			}
+		}
+
+		private function onStageKeyDown(event:KeyboardEvent):void
+		{
+			if(event.ctrlKey)
+			{
+			
+			}
+		}
+	
+	]]>
+    </mx:Script>
+
+
+
+    <bridge:FABridge xmlns:bridge="bridge.*" id="bridgeInst" />
+
+	<assets:AssetList/>
+
+
+	<mx:HDividedBox id="mainHDivider" liveDragging="true"
+		width="100%" height="100%"
+		doubleClickEnabled="true" 
+		dividerColor="0xFFFFFF" dividerAlpha="1.0"
+		doubleClick="onDoubleClickDivider(event)"
+		dividerDrag="onDividerDrag(event)">
+
+		<leftPanels:LeftPanel id="leftPanel" width="22%" height="100%" metaCloudPanel="{rightPanel.metaCloudPanel}"/>
+
+		<centerPanels:CenterPanel id="centerPanel" width="55%" height="100%"/>
+
+	    <rightPanels:RightPanel id="rightPanel" width="23%" height="100%"/>
+
+	</mx:HDividedBox>
+
+
+
+	<!--mx:Label id="fps" text="{timerVal}" includeInLayout="true" /-->
+
+
+	
+
+
+	<mx:states>
+		<mx:State name="initialization">
+		</mx:State>
+		<mx:State name="cloudDesign">
+			<mx:SetProperty target="{centerPanel}" name="visible" value="true"/>
+		</mx:State>
+		<mx:State name="cloudLibrary" enterState="onEnterStateCL()" exitState="onExitStateCL()">
+			<mx:SetProperty target="{centerPanel}" name="visible" value="false"/>
+		</mx:State>
+		<mx:State name="desinitialization">
+		</mx:State>
+	</mx:states>
+
+
+
+	<mx:transitions>
+
+		<mx:Transition fromState="cloudDesign" toState="cloudLibrary">
+			<!--mx:Parallel suspendBackgroundProcessing="true">
+				<mx:Resize target="{leftPanel}" widthFrom="{leftPanel.width}" widthTo="{rightPanel.x - leftPanel.width}" duration="250" />
+			</mx:Parallel-->
+		</mx:Transition>
+
+		<mx:Transition fromState="cloudLibrary" toState="cloudDesign">
+			<!--mx:Parallel suspendBackgroundProcessing="true">
+				<mx:Resize target="{leftPanel}" widthFrom="{leftPanel.width}" widthTo="{oldLeftPaneWidth}" duration="250" />
+			</mx:Parallel-->
+		</mx:Transition>
+
+	</mx:transitions>
+
+
+
+	<mx:Style>
+
+
+		Application
+		{
+		  	backgroundColor: #FFFFFF;
+		   	backgroundGradientColors: #FFFFFF, #FFFFFF;
+		   	backgroundGradientAlphas: 1.0, 1.0;
+		   	paddingLeft: 10; paddingTop: 10; paddingRight: 10; paddingBottom: 10;
+		   	themeColor: #99ff00;
+		}
+
+		LinkButton
+		{
+			color: blue;
+			paddingLeft: 0; paddingRight: 0;
+			textDecoration: normal;
+		}
+
+		ScrollBar
+		{
+   			track-colors: #ffffff, #ffffff;
+   			fill-colors: #ffffff, #ffffff;
+   		}
+
+		/* TriCloud Main Panel (left, center, right) */
+		.CloudPanel
+		{
+			background-color: #EFEFEF; background-alpha: 1.0;
+			horizontalAlign: left; verticalAlign: top;
+			horizontalGap:5; verticalGap:5;
+			paddingTop: 10; paddingLeft: 10; paddingRight: 10; paddingBottom: 10;
+		   	headerHeight: 0;
+		   	borderThicknessTop: 0; borderThicknessLeft: 0; borderThicknessRight: 0; borderThicknessBottom: 0;
+		   	borderStyle: solid; borderColor: #BFBFBF; borderThickness: 1; cornerRadius: 30;
+		  	dropShadowEnabled: false; dropShadowColor: #000000;
+  		}
+
+		/* TriCloud Popup Dialog */
+		.CloudDialog
+		{
+			headerColors: #DADADA, #DADADA;
+			footerColors: #DADADA, #DADADA;
+
+		    background-color: #F7F7F7; background-alpha: 0.85;
+		    horizontalAlign: left; verticalAlign: top;
+		    horizontalGap:5; verticalGap:5;
+		    paddingTop: 5; paddingLeft: 10; paddingRight: 10; paddingBottom: 10;
+
+		    borderThicknessTop: 1; borderThicknessLeft: 0; borderThicknessRight: 0; borderThicknessBottom: 0;
+		    borderStyle: solid; borderColor: #BFBFBF; borderThickness: 2; cornerRadius: 15;
+  			dropShadowEnabled: true; dropShadowColor: #000000;
+  		}
+
+		/* Top Title Bar for every popup dialogs */
+		.CloudDialogTitle
+		{
+			fontWeight: bold;
+		}
+
+		/* doesnt work */
+		.CloudFormItem : FormItemLabel
+		{
+			fontWeight: bold;
+		}
+
+
+		Alert
+		{
+			headerColors: #DADADA, #DADADA;
+			footerColors: #DADADA, #DADADA;
+
+			titleStyleName: CloudDialogTitle;
+			color: #000000;
+			background-color: #F7F7F7; background-alpha: 0.75;
+		    horizontalAlign: left; verticalAlign: top;
+		    horizontalGap:5; verticalGap:5;
+		    paddingTop: 0; paddingLeft: 10; paddingRight: 10; paddingBottom: 10;
+
+		    borderThicknessTop: 0; borderThicknessLeft: 0; borderThicknessRight: 0; borderThicknessBottom: 0;
+		    borderStyle: solid; borderColor: #BFBFBF; borderThickness: 1; cornerRadius: 15;
+  			dropShadowEnabled: true; dropShadowColor: #000000;
+		}
+
+
+		/* TriCloud Popup Menus */
+		.CloudMenu
+		{
+			background-color: #F7F7F7; background-alpha: 0.85;
+			verticalGap: 0;
+			color: blue;
+			bottom: 5;
+			top: 5;
+			paddingTop: 5; paddingLeft: 5; paddingRight: 0; paddingBottom: 2;
+
+			borderStyle: solid; borderColor: #BFBFBF; borderThickness: 1; cornerRadius: 15;
+			dropShadowEnabled: true; dropShadowColor: #000000;
+		}
+
+
+		/* TriCloud Image Import/Export */
+		.ImageService
+		{
+			horizontalAlign: center; verticalAlign: middle;
+			horizontalGap:5; verticalGap:5;
+			paddingTop: 10; paddingLeft: 10; paddingRight: 10; paddingBottom: 10;
+		   	borderStyle: none;
+		  	dropShadowEnabled: false;
+  		}
+
+		/* TriCloud Image Import/Export Button */
+		.ImageServiceButton
+		{
+			width: 30; buttonWidth: 100;
+			labelPlacement: center;
+			paddingBottom: 10;
+			verticalAlign: middle;
+		}
+
+		.OkButton
+		{
+			icon:Embed(source="./assets/images/ok.gif");
+		}
+
+		.CancelButton
+		{
+			icon:Embed(source="./assets/images/cancel.gif");
+		}
+
+
+	</mx:Style>
+
+
+		
+
+
+</mx:Application>

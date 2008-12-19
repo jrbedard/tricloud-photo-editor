@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Box xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:cloudPanels="panels.*" xmlns:centerPanels="panels.center.*" xmlns:cloudControls="controls.*"
+	xmlns:core="core.*"
+   	clipContent="true"
+   	autoLayout="false"
+   	horizontalScrollPolicy="off" verticalScrollPolicy="off"
+
+    backgroundColor="0xEBEBF5" backgroundAlpha="1.0"
+    borderStyle="solid" borderColor="0xc0c0ee" borderThickness="1" cornerRadius="0"
+   	paddingBottom="0" paddingLeft="0" paddingRight="0" paddingTop="0"
+ 	dropShadowEnabled="false"
+    horizontalCenter="0" verticalCenter="0"
+    horizontalAlign="center" verticalAlign="middle"
+
+    creationComplete="onCreationComplete()"
+    resize="onResize(event)"
+	mouseDown="onMouseDown(event)">
+
+
+
+    <mx:Script>
+    <![CDATA[
+
+        import mx.controls.Alert;
+        import mx.events.ResizeEvent;
+
+		import core.CanvasController;
+		import controls.PanControl;
+
+
+		// Canvas Controller
+		private var canvasController:CanvasController = null;
+
+
+
+
+        public function onCreationComplete():void
+        {
+
+        }
+
+
+        public function init():void
+       	{
+       		canvasController = CloudEngine.GetInstance().GetCanvasController();
+       		canvasController.SetCanvas(canvas);
+        }
+
+
+		private function onResize(event:ResizeEvent):void
+		{
+			
+		}
+
+
+		// MouseDown the view
+		private function onMouseDown(event:MouseEvent):void
+		{
+			if(event.target != this) // clicking on this trough canvas or other
+			{
+				return;
+			}
+
+			var panControl:PanControl = CenterPanel(this.parent).panControl;
+			if(panControl)
+			{
+				panControl.MouseDownPanTarget(event.stageX, event.stageY);
+			}
+		}
+
+
+ 
+    ]]>
+    </mx:Script>
+
+	
+
+	<core:CanvasCloud id="canvas" 
+		width="400" height="400" 
+		visible="true"
+		cloudController="{cloudController}" />
+
+	<!-- Must be after the canvas to catch the click events -->
+
+	<core:CloudNavigator id="cloudNavigator" canvas="{canvas}"/>
+
+	<core:CloudController id="cloudController" cloudNavigator="{cloudNavigator}"/>
+
+
+
+</mx:Box>

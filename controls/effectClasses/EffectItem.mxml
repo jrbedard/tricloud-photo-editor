@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Image xmlns:mx="http://www.adobe.com/2006/mxml"
+	width="32" height="32"
+	toolTip="{effect.name}"
+	source="{iconBitmap}"
+	maintainAspectRatio="true"
+
+	creationComplete="onCreationComplete()"
+ 	dataChange="onDataChange(event)">
+
+
+	<mx:Script>
+	<![CDATA[
+
+		[Bindable]
+		private var effect:CloudEffect = null;
+
+		[Bindable]
+		private var iconBitmap:Bitmap = null;
+
+
+		private function onCreationComplete():void
+		{
+			
+		}
+
+		private function onDataChange(event:Event):void
+		{
+			this.effect = this.data as CloudEffect;
+
+			if(effect && effect.iconBitmap)
+			{
+				iconBitmap = new Bitmap(effect.iconBitmap.bitmapData, "auto", true);
+			}
+		}
+
+	]]>
+    </mx:Script>
+
+</mx:Image>

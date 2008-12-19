@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml" 
+	width="220" height="210"
+	layout="vertical"
+	titleIcon="{Globals.g_assets.WarpIcon}"
+	title="Image Effect"
+	horizontalScrollPolicy="off" verticalScrollPolicy="off"
+	showCloseButton="true"
+
+	styleName="CloudDialog"
+	titleStyleName="CloudDialogTitle"
+	paddingTop="0" paddingBottom="0"
+
+	creationComplete="onCreationComplete()">
+
+
+	<mx:Script>
+    <![CDATA[
+
+		import mx.events.ListEvent;
+		import mx.collections.ArrayCollection;
+		import mx.managers.PopUpManager;
+
+		import library.CloudLibraryBrowseEvent;
+		import share.ShareController;
+		
+
+		// Static instance, singleton
+		public static var effectDialog:EffectDialog = new EffectDialog();
+
+		private var effectCreation:EffectCreation = EffectCreation.effectCreation;
+
+
+		[Bindable]
+		public var effectList:ArrayCollection = new ArrayCollection(); // Array of Effects
+
+
+		private function onCreationComplete():void
+		{
+			PopulateEffectList();
+
+			effectGrid.selectedIndex = 0;
+
+			// Set the Right Click menu for this Dialog
+   			var rightClickMenu:RightClickMenu = new RightClickMenu(this.title);
+   			this.contextMenu = rightClickMenu.triCloudContextMenu;
+
+   			effectCreation.addEventListener('newShape', onNewEffectCreated);
+		}
+
+		private function PopulateEffectList():void
+		{
+			var effectFactory:EffectFactory = new EffectFactory();
+			effectFactory.Populate(effectList);
+		}
+
+		private function onItemClickEffectList(event:ListEvent):void
+ 		{
+ 			this.dispatchEvent(new EffectEvent("effectChanged", event.target.selectedItem as CloudEffect));
+ 		}
+
+		private function onItemDoubleClickEffectList(event:ListEvent):void
+		{
+			onItemClickEffectList(event);
+			this.dispatchEvent(new Event('close'))
+		}
+
+
+
+		private function onClickBrowse():void
+		{
+			// Open the Cloud Library to browse/search for Effects
+			TriCloud(this.parentApplication).dispatchEvent(
+				new CloudLibraryBrowseEvent("browseCloudLibrary", '', "useCount", CloudType.ST_EFFECT));
+		}
+
+		private function onClickCreateEffect():void
+		{
+			PopUpManager.addPopUp(effectCreation, this.parentApplication as DisplayObject, false);
+			PopUpManager.centerPopUp(effectCreation); // Center Shape Creation dialog
+
+		}
+
+		private function onNewEffectCreated(effectEvent:EffectEvent):void
+		{
+			// Add new effect to list
+			effectList.addItemAt(effectEvent.effect, 0); // add on top
+
+			effectGrid.validateNow();
+		}
+
+		private function onClickShareEffect():void
+		{
+			var shareController:ShareController = CloudEngine.GetInstance().GetShareController();
+			shareController.ShareCloud(effectGrid.selectedItem as CloudEffect, CloudType.ST_EFFECT);
+
+			// Close Shape Dialog
+			this.dispatchEvent(new Event("close"));
+		}
+
+	]]>
+    </mx:Script>
+
+
+	<!-- EFFECT LIST -->
+	<mx:TileList id="effectGrid" width="100%" height="100%"
+		wordWrap="true"
+		allowDragSelection="false" dragEnabled="false" dropEnabled="false"
+		rowCount="8" rowHeight="36" 
+		columnCount="8" columnWidth="36"
+		doubleClickEnabled="true"
+
+		verticalAlign="middle"
+		backgroundAlpha="0.5"
+		dropShadowEnabled="false"
+
+		dataProvider="{effectList}"
+		itemRenderer="controls.effectClasses.EffectItem"
+		itemClick="onItemClickEffectList(event)"
+		itemDoubleClick="onItemDoubleClickEffectList(event)"/>
+
+
+	<mx:ControlBar width="100%"
+		horizontalAlign="center"
+		paddingBottom="3" paddingLeft="0" paddingRight="0" paddingTop="3">
+
+		<mx:Button id="browseButton" icon="{Globals.g_assets.TriCloudIcon16}"
+			toolTip="Browse/Search Effects in the Cloud Library"
+			click="onClickBrowse()" />
+
+		<mx:Button id="createEffectBtn" icon="{Globals.g_assets.AddTagIcon}" 
+			toolTip="Create Effect"
+			click="onClickCreateEffect()" />
+
+		<mx:Button id="shareEffectBtn" icon="{Globals.g_assets.ShareIcon}"
+			toolTip="Share this Effect"
+			click="onClickShareEffect(); // Dislpay Button only if Brush's remoteID == '0'"/>
+
+	</mx:ControlBar>
+
+
+</mx:TitleWindow>

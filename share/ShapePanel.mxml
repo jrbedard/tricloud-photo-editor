@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml" >
+
+
+	<mx:Script>
+    <![CDATA[
+
+		import controls.shapeClasses.CloudShape;
+
+
+		[Bindable]
+		private var cloudShape:CloudShape = null;
+
+		[Bindable]
+		private var shapeXML:XML = null;
+
+
+		// Init
+		public function init(cloudShape:CloudShape):void
+		{
+			this.cloudShape = cloudShape;
+
+			shapeXML = this.cloudShape.Save();
+		}
+
+	]]>
+    </mx:Script>
+
+
+</mx:VBox>

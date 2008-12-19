@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Button xmlns:mx="http://www.adobe.com/2006/mxml"
+	width="36" height="36"
+	toolTip="{selectedWarp.name} Warp"
+	buttonMode="true"
+
+	selectedUpSkin="controls.colorClasses.ColorButtonSkin"
+	selectedOverSkin="controls.colorClasses.ColorButtonSkin"
+	upSkin="controls.colorClasses.ColorButtonSkin"
+	overSkin="controls.colorClasses.ColorButtonSkin"
+	downSkin="controls.colorClasses.ColorButtonSkin"
+	selectedDownSkin="controls.colorClasses.ColorButtonSkin"
+	disabledSkin="controls.colorClasses.ColorButtonSkin"
+	selectedDisabledSkin="controls.colorClasses.ColorButtonSkin"
+
+	creationComplete="onCreationComplete()">
+
+
+	<mx:Script>
+    <![CDATA[
+
+		import mx.managers.PopUpManager;
+
+		import controls.warpClasses.*;
+
+
+		private var warpDialog:WarpDialog = WarpDialog.warpDialog;
+		private var warpDialogVisible:Boolean = false; // panel open
+
+		private var _selectedWarp:CloudWarp= new CloudWarp(); // select default warp by default
+
+		private var warpMatrix:Matrix = new Matrix();
+
+
+		public function set selectedWarp(warp:CloudWarp):void
+		{
+			_selectedWarp = warp;
+		}
+		[Bindable]
+		public function get selectedWarp():CloudWarp
+		{
+			return _selectedWarp;
+		}
+
+
+    	private function onCreationComplete():void
+		{
+			warpDialog.addEventListener("warpChanged", onWarpChanged);
+			warpDialog.addEventListener("close", onCloseWarpPanel);
+
+			UpdateButtonImage();
+		}
+
+
+		protected override function clickHandler(event:MouseEvent):void
+		{
+			event.stopPropagation(); // Dont continue click event on something below this control
+
+			if(!warpDialogVisible)
+			{
+				CloudDialogManager.OpenDialog(warpDialog, this);
+				warpDialogVisible = true;
+
+				warpDialog.warpGrid.selectedItem = selectedWarp;
+			}
+			else
+			{
+				CloudDialogManager.CloseDialog(warpDialog);
+				warpDialogVisible = false;
+			}
+		}
+
+
+		// A brush was selected
+		private function onWarpChanged(event:WarpEvent):void
+		{
+			selectedWarp = event.warp;
+			UpdateButtonImage();
+		}
+
+		private function onCloseWarpPanel(event:Event):void
+		{
+			CloudDialogManager.CloseDialog(warpDialog);
+			warpDialogVisible = false;
+		}
+
+
+		private function UpdateButtonImage():void
+		{
+			if(!selectedWarp || !selectedWarp.iconBitmap)
+				return;
+
+			warpMatrix.createBox((this.width-8)/selectedWarp.iconBitmap.width, 
+								 (this.height-8)/selectedWarp.iconBitmap.height,
+								 0,
+								 4,4);
+
+			this.graphics.clear();
+			this.graphics.beginBitmapFill(selectedWarp.iconBitmap.bitmapData, warpMatrix, false, true);
+			this.graphics.drawRect(4,4, this.width-8, this.height-8);
+			this.graphics.endFill();
+		}
+
+    ]]>
+    </mx:Script>
+
+	
+</mx:Button>

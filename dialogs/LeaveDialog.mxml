@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:cloudPanels="panels.*"
+	width="300" height="600"
+	titleIcon="{Globals.g_assets.ImageImporter}"
+	title="Leaving TriCloud"
+	layout="vertical"
+	horizontalScrollPolicy="off" verticalScrollPolicy="off"
+	showCloseButton="true"
+
+	styleName="CloudDialog"
+	titleStyleName="CloudDialogTitle"
+	horizontalAlign="center" verticalAlign="middle"
+
+	creationComplete="onCreationComplete()"
+	close="onClickCancel()">
+
+
+	<mx:Script>
+    <![CDATA[
+		import mx.events.CloseEvent;
+		import mx.managers.PopUpManager;
+
+		import core.CanvasCloud;
+
+
+		// Static instance, singleton
+		public static const leaveDialog:LeaveDialog = new LeaveDialog();
+
+
+		private function onCreationComplete():void
+    	{
+			// Set the Right Click menu for this Dialog
+   			var rightClickMenu:RightClickMenu = new RightClickMenu(this.title);
+   			this.contextMenu = rightClickMenu.triCloudContextMenu;
+    	}
+
+		public function init(canvas:CanvasCloud):void
+		{
+			
+		}
+
+
+		private function onClickOk():void
+		{
+			PopUpManager.removePopUp(leaveDialog);
+		}
+
+		private function onClickCancel():void
+		{
+			PopUpManager.removePopUp(leaveDialog);
+		}
+
+ 	]]>
+    </mx:Script>
+
+
+	<!-- LEAVE TRICLOUD -->
+
+	<mx:Label text="Before leaving TriCloud, do you want to Share any of these Clouds with the TriCloud community?" />
+
+
+	<!-- CLOUD LIST -->
+	<mx:List id="cloudList" width="100%"
+		editable="false"
+		allowDragSelection="false" dragEnabled="false" dropEnabled="false"
+		doubleClickEnabled="true"
+		
+		verticalAlign="middle"
+		backgroundAlpha="0.5"
+		dropShadowEnabled="false"/>
+
+    <mx:ControlBar>
+		<mx:Button id="okButton" label="Ok" click="onClickOk()" styleName="OkButton" />	
+		<mx:Button id="cancelButton" label="Cancel" click="onClickCancel()" styleName="CancelButton" />		
+	</mx:ControlBar>
+    
+</mx:TitleWindow>

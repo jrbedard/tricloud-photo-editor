@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Button xmlns:mx="http://www.adobe.com/2006/mxml"
+	width="36" height="36"
+	toolTip="{selectedEffect.name} Effect"
+
+	selectedUpSkin="controls.colorClasses.ColorButtonSkin"
+	selectedOverSkin="controls.colorClasses.ColorButtonSkin"
+	upSkin="controls.colorClasses.ColorButtonSkin"
+	overSkin="controls.colorClasses.ColorButtonSkin"
+	downSkin="controls.colorClasses.ColorButtonSkin"
+	selectedDownSkin="controls.colorClasses.ColorButtonSkin"
+	disabledSkin="controls.colorClasses.ColorButtonSkin"
+	selectedDisabledSkin="controls.colorClasses.ColorButtonSkin"
+
+	creationComplete="onCreationComplete()">
+
+
+	<mx:Script>
+    <![CDATA[
+
+		import mx.managers.PopUpManager;
+
+		import controls.effectClasses.*;
+
+
+		private var effectDialog:EffectDialog = EffectDialog.effectDialog;
+		private var effectDialogVisible:Boolean = false; // panel open
+
+		private var _selectedEffect:CloudEffect = new CloudEffect(); // select default warp by default
+
+		private var effectMatrix:Matrix = new Matrix();
+
+
+
+		public function set selectedEffect(effect:CloudEffect):void
+		{
+			_selectedEffect = effect;
+		}
+		[Bindable]
+		public function get selectedEffect():CloudEffect
+		{
+			return _selectedEffect;
+		}
+
+
+    	private function onCreationComplete():void
+		{
+			effectDialog.addEventListener("effectChanged", onEffectChanged);
+			effectDialog.addEventListener("close", onCloseEffectPanel);
+
+			UpdateButtonImage();
+		}
+
+
+		protected override function clickHandler(event:MouseEvent):void
+		{
+			event.stopPropagation(); // Dont continue click event on something below this control
+
+			if(!effectDialogVisible)
+			{
+				CloudDialogManager.OpenDialog(effectDialog, this);
+				effectDialogVisible = true;
+
+				effectDialog.effectGrid.selectedItem = selectedEffect;
+			}
+			else
+			{
+				CloudDialogManager.CloseDialog(effectDialog);
+				effectDialogVisible = false;
+			}
+		}
+
+
+		// A brush was selected
+		private function onEffectChanged(event:EffectEvent):void
+		{
+			selectedEffect = event.effect;
+			UpdateButtonImage();
+		}
+
+		private function onCloseEffectPanel(event:Event):void
+		{
+			CloudDialogManager.CloseDialog(effectDialog);
+			effectDialogVisible = false;
+		}
+
+
+		private function UpdateButtonImage():void
+		{
+			if(!selectedEffect || !selectedEffect.iconBitmap)
+				return;
+
+			effectMatrix.createBox((this.width-8)/selectedEffect.iconBitmap.width, 
+								 (this.height-8)/selectedEffect.iconBitmap.height,
+								 0,
+								 4,4);
+
+			this.graphics.clear();
+			this.graphics.beginBitmapFill(selectedEffect.iconBitmap.bitmapData, effectMatrix, false, true);
+			this.graphics.drawRect(4,4, this.width-8, this.height-8);
+			this.graphics.endFill();
+		}
+
+    ]]>
+    </mx:Script>
+
+	
+</mx:Button>

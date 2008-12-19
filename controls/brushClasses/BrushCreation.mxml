@@ -1,0 +1,295 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:cloudControls="cloud.controls.*" 
+	layout="vertical"
+	titleIcon="{Globals.g_assets.DrawBrushIcon}"
+	title="Import/Create Brush"
+	horizontalScrollPolicy="off" verticalScrollPolicy="off"
+	showCloseButton="true"
+
+	styleName="CloudDialog"
+	titleStyleName="CloudDialogTitle"
+
+	creationComplete="onCreationComplete()"
+	close="onClickCancel()">
+
+
+	<mx:Script>
+    <![CDATA[
+
+		import mx.managers.PopUpManager;
+		import mx.controls.SWFLoader;
+
+		import core.CanvasCloud;
+		import core.Cloud;
+		import image.ImportDialog;
+		import image.ImageEvent;
+
+
+		// Static instance, singleton
+		public static var brushCreation:BrushCreation = new BrushCreation();
+
+		// Image Importer Dialog
+		private var imageImportDialog:ImportDialog = ImportDialog.imageImportDialog;
+
+		[Bindable]
+		private var canvas:CanvasCloud = null;
+
+		[Bindable]
+		private var brushBitmap:Bitmap = null;
+
+		[Bindable]
+		private var sampleBitmap:Bitmap = null;
+
+
+
+		private function onCreationComplete():void
+		{
+			imageImportDialog.addEventListener("importImage", onImportImageDialog); // detect closing and importing img
+			imageImportDialog.addEventListener("close", onCloseCancelImageDialog); // detect closing
+		}
+
+
+		public function init():void
+		{
+			brushSourceBox.visible = true;
+			createdBrushBox.visible = false;
+
+			okButton.enabled = false;
+
+			// Get Clouds XML to populate combobox
+			canvas = CloudEngine.GetInstance().GetCanvasController().GetCanvas();
+
+			//cloudComboBox.dataProvider 
+		}
+
+
+
+		private function onClickImportCloud():void
+		{
+			if(!canvas || !cloudComboBox)
+				return;
+
+			var cloudName:String = cloudComboBox.selectedLabel;
+
+			// TODO: Unsafe if 2 clouds have the same names
+			var sCloud:Cloud = canvas.FindCloudByName(cloudName);
+			if(sCloud)
+			{
+				var cloudBmpData:BitmapData = sCloud.GetBitmapData();
+
+				var brushMatrix:Matrix = new Matrix();
+				brushMatrix.scale(48 / cloudBmpData.width, 48 / cloudBmpData.height); // Scale Cloud BmpData to fit in Brush
+
+				var brushBmpData:BitmapData = new BitmapData(48, 48, true, 0);
+				brushBmpData.draw(cloudBmpData, brushMatrix);
+
+				brushBitmap = new Bitmap(cloudBmpData.clone(), "auto", true); // Create Brush Bitmap
+
+				brushNameInput.text = sCloud.name;
+
+				// Create Brush
+				CreateBrush();
+			}
+		}
+
+
+
+		private function onClickImportImage():void
+		{
+			// Show Image Importer Dialog
+			PopUpManager.addPopUp(imageImportDialog, this.parentApplication as DisplayObject, true); // more optimal?
+			imageImportDialog.Init();
+			PopUpManager.centerPopUp(imageImportDialog); // Center Image dialog	
+		}
+
+		private function onImportImageDialog(event:ImageEvent):void
+        {
+            PopUpManager.removePopUp(imageImportDialog); // Close image dialog
+
+            // Retreive image
+            if(event.m_bmp) // if bitmap was imported
+            {
+            	// Brush Bitmap
+            	brushBitmap = new Bitmap(event.m_bmp.bitmapData, "auto", false);
+
+            	// Brush Name
+				brushNameInput.text = event.m_cloudName;
+
+				// Create Brush
+				CreateBrush();
+            }
+            else
+            {
+            	CloudAlert.show('There was a problem retreiving the image.', 'Cloud Error');
+            }
+        }
+
+		private function onCloseCancelImageDialog(event:Event):void
+		{
+			 PopUpManager.removePopUp(imageImportDialog); // Close image dialog
+		}
+
+
+
+		private function CreateBrush():void
+		{
+			brushSourceBox.visible = false;
+			createdBrushBox.visible = true;
+
+			GenerateBrushSample();
+
+			// Enable Importing
+			okButton.enabled = true;
+		}
+
+
+
+		/* Sources:
+		- Image Import or Cloud
+		*/
+
+
+		// Generate the brush sample
+		private function GenerateBrushSample():void
+		{
+			if(!brushSample || !brushBitmap)
+				return;
+
+			const pad:uint = 4;
+			const step:uint = 4;
+
+			var brushBmpData:BitmapData = brushBitmap.bitmapData;
+			var brushMatrix:Matrix = new Matrix();
+			brushMatrix.scale(48 / brushBitmap.width, 48 / brushBitmap.height);
+
+			brushSample.graphics.clear();
+			brushSample.graphics.lineStyle(0, 0x000000, 0.0);
+
+			for(var strokeX:uint = 0; strokeX < brushSample.width - 16; strokeX += step)
+			{
+				var waveY:int = (brushSample.height/4) * Math.sin((strokeX/brushSample.width)*(2*Math.PI)) + (brushSample.height/4);
+
+				// Scale and translate brush
+				brushMatrix.identity();
+				brushMatrix.scale(0.5, 0.5); // 16x16 stroke
+				brushMatrix.translate(strokeX, waveY);
+
+				// Draw brush on canvas
+				brushSample.graphics.beginBitmapFill(brushBmpData, brushMatrix, false, true);
+				brushSample.graphics.drawRect(strokeX, waveY, brushBmpData.width, brushBmpData.height);
+				brushSample.graphics.endFill();
+			}
+			// clip
+
+			// Sample Alpha
+			//var colorTransform:ColorTransform = new ColorTransform();
+			//colorTransform.alphaMultiplier = 0.5;
+			// TODO: Alpha Gradient
+
+			var sampleBmpData:BitmapData = new BitmapData(brushSample.width, brushSample.height, true, 0);
+			sampleBmpData.draw(brushSample);
+			sampleBitmap = new Bitmap(sampleBmpData, "auto", true);
+		}
+
+
+		private function onClickOk():void
+		{
+			var brush:CloudBrush = new CloudBrush();
+			brush.name = brushNameInput.text;
+
+			// Composite Brush Icon and Sample
+
+			// Draw Brush Icon
+			var iconBmpData:BitmapData = new BitmapData(160, 32, true, 0);
+			iconBmpData.draw(brushBitmap);
+
+			// Draw Brush Sample
+			var sampleMatrix:Matrix = new Matrix();
+			sampleMatrix.translate(48, 0);
+
+			iconBmpData.draw(sampleBitmap, sampleMatrix);
+
+			brush.iconBitmap = new Bitmap(iconBmpData, "auto", false); // Composite Brush Icon + Sample
+			this.dispatchEvent(new BrushEvent('newBrush', brush));
+
+			PopUpManager.removePopUp(brushCreation);
+		}
+
+
+		private function onClickCancel():void
+		{
+			PopUpManager.removePopUp(brushCreation);
+		}
+
+ 	]]>
+    </mx:Script>
+
+
+	<mx:VBox id="brushSourceBox" borderStyle="solid"
+		visible="true" includeInLayout="{brushSourceBox.visible}"
+		paddingLeft="5" paddingTop="5" paddingRight="5" paddingBottom="5"
+		verticalGap="3">
+
+		<mx:Label text="Brush Source:" fontWeight="bold" />
+
+		<mx:HBox horizontalGap="5" verticalAlign="middle">
+
+			<mx:Label text="From Imported Image:"/>
+			<mx:Button id="importButton" label="Import Image" click="onClickImportImage()" enabled="true" />
+
+		</mx:HBox>
+
+		<mx:Label text="Or" fontWeight="bold"/>
+
+		<mx:HBox horizontalGap="5" verticalAlign="middle">
+			<mx:Label text="From Local Cloud:"/>
+			<mx:ComboBox id="cloudComboBox" dataProvider="{canvas.cloudsXML}" labelField="@name" />
+			<mx:Button id="importCloudBtn" label="Import" click="onClickImportCloud()" />	
+		</mx:HBox>
+
+	</mx:VBox>
+
+
+	<mx:VBox id="createdBrushBox"
+		visible="false" includeInLayout="{createdBrushBox.visible}"
+		horizontalAlign="center" borderStyle="solid">
+
+		<mx:Form width="100%"
+			borderStyle="solid"
+			paddingTop="10" paddingLeft="10" paddingRight="10" paddingBottom="10">
+
+			<!-- BRUSH BITMAP -->
+			<mx:HBox horizontalGap="0" horizontalAlign="center" verticalAlign="middle"
+				borderStyle="solid">
+
+				<mx:Image id="brushImage" source="{brushBitmap}" 
+					width="48" height="48" maintainAspectRatio="true"/>
+				<mx:Box id="brushSample" width="128" height="32" />
+
+			</mx:HBox>
+
+			<mx:FormItem label="Brush Name:">
+				<mx:TextInput id="brushNameInput" />
+			</mx:FormItem>
+
+			<mx:FormItem label="Flow:">
+				<mx:HSlider id="flowSlider" />
+			</mx:FormItem>
+
+		</mx:Form>
+
+	</mx:VBox>
+
+
+	<mx:Label id="shareFontText" text="Don't forget to share () this Font with other users!" 
+		fontWeight="bold" visible="false" />
+
+	<mx:ControlBar width="100%"
+		horizontalAlign="center">
+
+		<mx:Button id="okButton" label="Import" click="onClickOk()" styleName="OkButton" enabled="false" />
+		<mx:Button id="cancelButton" label="Cancel" click="onClickCancel()" styleName="CancelButton" />
+
+	</mx:ControlBar>
+
+</mx:TitleWindow>

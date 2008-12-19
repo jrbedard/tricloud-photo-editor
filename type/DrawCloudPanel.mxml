@@ -1,0 +1,622 @@
+<?xml version="1.0" encoding="utf-8"?>
+<cloudType:CloudToolPanel xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:cloudType="type.*" 
+	xmlns:cloudDraw="type.draw.*" xmlns:cloudControls="controls.*"
+	label="Draw Cloud" 
+	creationComplete="onCreationComplete()">
+
+
+	<mx:Script>
+    <![CDATA[
+    	import flash.display.JointStyle;
+    	import flash.display.CapsStyle;
+    	import mx.controls.Image;
+    	import mx.controls.Alert;
+    	import mx.events.ItemClickEvent;
+
+		import core.Cloud;
+		import core.CloudController;
+    	import type.DrawCloud;
+    	import type.draw.DrawTag;
+    	import type.draw.DrawStyle;
+
+
+		[Bindable]
+		private var drawCloud:DrawCloud = null;
+
+		[Bindable]
+		private var drawStyle:DrawStyle = null;
+
+
+
+		private function onCreationComplete():void
+		{
+			selectedTool = drawToolViewStack.selectedChild.name;
+
+			onChangeDrawToolState();
+		}
+
+
+
+		public function SetCloud(sCloud:Cloud):void
+		{
+			drawCloud = DrawCloud(sCloud);
+
+			drawStyle = drawCloud.drawStyle;
+
+			drawController.SetCloud(drawCloud);
+		}
+
+		public function GetCloud():Cloud
+		{
+			return drawCloud;
+		}
+
+
+		// Get the index of the DrawTool in the View Stack for the tool name
+		private function GetSelectedDrawToolIndex(selectedTool:String):int
+		{
+			var dispObj:DisplayObject = drawToolViewStack.getChildByName(selectedTool);
+			if(dispObj)
+			{
+				return drawToolViewStack.getChildIndex(dispObj);
+			}
+			return 0;
+		}
+
+
+		private function onClickDrawToolBar(event:ItemClickEvent):void
+		{
+			// Animate CloudTool BackGround
+			
+
+			onChangeDrawToolState();
+		}
+
+
+		// Changed the state of the DrawToolBar
+		private function onChangeDrawToolState():void
+		{
+			var changedDrawTool:Boolean = false;
+			if(drawToolViewStack.selectedChild.name != selectedTool) // changed draw tool
+			{
+				changedDrawTool = true;
+
+				// Remove Popups
+				//CloudDialogManager.HideAllDialog();
+			}
+
+			selectedTool = drawToolViewStack.selectedChild.name;
+			if(drawStyle)
+			{
+				drawStyle.selectedTool = selectedTool; // Selected Tool
+			}
+			this.label = "Draw " + selectedTool;
+
+
+			if(selectedTool == DrawTag.BRUSH) // BRUSH
+			{
+				lineColor.visible = true;
+				lineColor.gradientEnabled = false;
+				lineColor.title = 'Brush';
+				fillColor.visible = false;
+				this.label = "Brush";
+				lineThickness.label = "Brush Size:";
+
+				if(brushControl && brushControl.selectedBrush)
+				{
+					lineThickness.cursorType = ThicknessControl.CURSOR_BITMAP;
+					lineThickness.cursorBitmap = brushControl.selectedBrush.iconBitmap; // set brush bitmap
+
+					brushControl.selectedBrush.hardness = hardnessControl.value/100;
+				}
+				CloudCursor.SetCursor(CloudCursor.DRAW_BRUSH);
+
+			}
+			else if(selectedTool == DrawTag.LINE) // LINE
+			{
+				lineColor.visible = true;
+				lineColor.gradientEnabled = true;
+				lineColor.title = 'Line';
+				fillColor.visible = false;
+
+				if(drawCurve.selected)
+				{
+					this.label = "Draw Curved Line";
+					lineColor.title = 'Curve';
+				}
+
+				if(drawRoundEndedLine.selected)
+				{
+					lineThickness.cursorType = ThicknessControl.CURSOR_CIRCLE;
+				}
+				else
+				{
+					lineThickness.cursorType = ThicknessControl.CURSOR_SQUARE;
+				}
+				lineThickness.label = "Line Thickness:";
+				CloudCursor.SetCursor(CloudCursor.DRAW_LINE);
+
+			}
+			else if(selectedTool == DrawTag.RECTANGLE) // RECTANGLE
+			{
+				lineColor.visible = true;
+				lineColor.gradientEnabled = true;
+				lineColor.title = 'Rectangle Contour';
+
+				if(drawFilledRect.selected)
+				{
+					fillColor.visible = true;
+					fillColor.gradientEnabled = true;
+					fillColor.title = 'Rectangle Fill';
+					this.label = "Draw Filled Rectangle";
+				}
+				else
+				{
+					fillColor.visible = false;
+				}
+
+				//if(drawRoundedRect.selected)
+				//{
+				//	lineThickness.cursorType = ThicknessControl.CURSOR_CIRCLE;
+				//}
+
+				lineThickness.cursorType = ThicknessControl.CURSOR_SQUARE;
+
+				lineThickness.label = "Contour Thickness:";
+				CloudCursor.SetCursor(CloudCursor.DRAW_RECTANGLE);
+
+			}
+			else if(selectedTool == DrawTag.ELLIPSE) // ELLIPSE
+			{
+				lineColor.visible = true;
+				lineColor.gradientEnabled = true;
+				lineColor.title = 'Ellipse Contour';
+
+				if(drawFilledEllipse.selected)
+				{
+					fillColor.visible = true;
+					fillColor.gradientEnabled = true;
+					fillColor.title = 'Ellipse Fill';
+					this.label = "Draw Filled Ellipse";
+				}
+				else
+				{
+					fillColor.visible = false;
+				}
+				lineThickness.label = "Contour Thickness:";
+				lineThickness.cursorType = ThicknessControl.CURSOR_CIRCLE;
+				CloudCursor.SetCursor(CloudCursor.DRAW_ELLIPSE);
+
+			}
+			else if(selectedTool == DrawTag.POLYLINE) // POLYLINE
+			{
+				lineColor.visible = true;
+				lineColor.gradientEnabled = true;
+				lineColor.title = 'Polyline Contour';
+
+				if(drawFilledPolyline.selected)
+				{
+					fillColor.visible = true;
+					fillColor.gradientEnabled = false;
+					fillColor.title = 'Polyline Fill';
+					this.label = "Draw Filled Polyline";
+				}
+				else
+				{
+					fillColor.visible = false;
+				}
+				this.label = "Draw " + selectedSubTool + " Polyline";
+				lineThickness.label = "Contour Thickness:";
+				CloudCursor.SetCursor(CloudCursor.DRAW_POLYLINE);
+
+			}
+			else if(selectedTool == DrawTag.SHAPE) // SHAPE
+			{
+				lineColor.visible = true;
+				lineColor.gradientEnabled = false;
+				/*
+				if(drawFilledShape.selected)
+				{
+					fillColor.visible = true;
+					fillColor.gradientEnabled = false;
+					fillColor.title = 'Custom Shape Fill';
+					this.label = "Draw Filled Custom Shape";
+				}
+				else
+				{
+					fillColor.visible = false;
+				}
+				*/
+				lineThickness.label = "Contour Thickness:";
+				CloudCursor.SetCursor(CloudCursor.DRAW_SHAPE);
+
+			}
+			else if(selectedTool == DrawTag.BUCKET) // Paint Bucket
+			{
+				lineColor.visible = false;
+				fillColor.visible = true;
+
+			}
+			else if(selectedTool == "Eraser") // Eraser
+			{
+				fillColor.visible = false;
+
+			}
+			else
+			{
+				CloudAlert.show("manage this toolbar!", 'Draw Cloud Error');
+			}
+
+			drawController.onParamChanged(changedDrawTool); // Notice DrawController
+		}
+
+
+		// BRUSH
+		private function onClickBrowseBrushLibrary():void
+		{
+			// TODO: events
+			(this.parentApplication).setCurrentState("cloudLibrary");
+		}
+
+		private function hardnessDataTipFunc(val:String):String
+		{
+			return val + '%';
+		}
+
+
+		// LINE
+
+		// RECTANGLE
+
+		// ELLIPSE
+
+		// SHAPE
+		private function onDrawShapeTypeClick(event:ItemClickEvent):void
+		{
+			if(!event.item)
+				return;
+
+			selectedSubTool = event.item.name;
+			onChangeDrawToolState();
+		}
+
+		private function onClickBrowseShapeLibrary():void
+		{
+			// TODO: events
+			(this.parentApplication).setCurrentState("cloudLibrary");
+		}
+
+
+		// Convert Draw Cloud to Image Cloud
+		private function onClickConvertToImageCloud():void
+		{
+			var cloudController:CloudController = CloudEngine.GetInstance().GetCloudController();
+
+			// Draw -> Image
+			cloudController.ConvertCloud(drawCloud, "Image");
+		}
+
+	]]>
+    </mx:Script>
+
+
+	<cloudDraw:DrawController id="drawController" />
+
+
+	<!-- COLOR & GRADIENT & ALPHA DRAW TOOLS -->
+	<mx:Canvas width="75" height="100%"
+		 borderStyle="none" borderSides="right">
+
+		<cloudControls:ColorControl id="lineColor"
+			width="40" height="40" x="8" y="8"
+			title="{selectedTool}"
+		 	toolTip="Select the {selectedTool} Color or Gradient"
+		 	selectedColor="{drawStyle.lineColor}"
+		 	selectedAlpha="{drawStyle.lineAlpha}"
+		 	gradientEnabled="true"
+		 	gradientSelected="{drawStyle.isLineGradient}"
+		 	selectedGradient="{drawStyle.lineGradient}"
+		 	change="drawStyle.lineColor = lineColor.selectedColor;
+		 			drawStyle.lineAlpha = lineColor.selectedAlpha;
+		 			drawStyle.isLineGradient = lineColor.gradientSelected;
+		 			drawStyle.lineGradient = lineColor.selectedGradient;
+		 			drawController.onParamChanged(false);"/>
+
+		<cloudControls:ColorControl id="fillColor" visible="false"
+			width="40" height="40" x="24" y="24"
+			title="{selectedTool} fill"
+		 	toolTip="Select the {selectedTool} fill Color or Gradient"
+		 	selectedColor="{drawStyle.fillColor}"
+		 	selectedAlpha="{drawStyle.fillAlpha}"
+		 	gradientEnabled="true"
+		 	gradientSelected="{drawStyle.isFillGradient}"
+		 	selectedGradient="{drawStyle.fillGradient}"
+		 	change="drawStyle.fillColor = fillColor.selectedColor;
+		 			drawStyle.fillAlpha = fillColor.selectedAlpha;
+		 			drawStyle.isFillGradient = fillColor.gradientSelected;
+		 			drawStyle.fillGradient = fillColor.selectedGradient;
+		 			drawController.onParamChanged(false);"
+		 	showEffect="cloudSubToolShow"
+		 	hideEffect="cloudSubToolHide"/>
+
+
+		<mx:Button id="convertToImageCloudBtn" x="0" y="70"
+			width="48" height="24"
+			toolTip="Convert Draw Cloud into Image Cloud"
+			click="onClickConvertToImageCloud()"/>
+
+	</mx:Canvas>
+
+
+
+	<!-- DRAW TOOL PANEL -->
+	<mx:VBox id="drawToolBox" width="100%" height="100%"
+		horizontalAlign="center" verticalAlign="top"
+		verticalGap="0">
+
+
+		<!-- DRAW TOOLBAR -->
+		<mx:TabBar id="drawToolBar"
+			dataProvider="{drawToolViewStack}"
+			direction="horizontal"
+			tabWidth="42" tabHeight="32"
+			buttonMode="true"
+
+			styleName="CloudToolBar"
+			tabStyleName="CloudToolTab"
+			buttonStyleName="CloudToolButton"
+
+			selectedIndex="{(drawStyle ? GetSelectedDrawToolIndex(drawStyle.selectedTool) : 0)}"
+			itemClick="onClickDrawToolBar(event)"/>
+
+
+		<!-- DRAW TOOLS VIEWSTACK -->
+		<mx:ViewStack id="drawToolViewStack" width="100%" height="100%"
+			creationPolicy="all" selectedIndex="0"
+			styleName="CloudViewStack">
+
+
+			<!-- BRUSH DRAW TOOLS -->
+			<mx:VBox id="brushBox" name="{DrawTag.BRUSH}" width="100%"
+				icon="{Globals.g_assets.DrawBrushIcon}"
+				toolTip="Draw Brush Stroke"
+				styleName="CloudTool"
+				showEffect="cloudToolShow"
+				hideEffect="cloudToolHide">
+
+				<mx:Label text="{this.label}" styleName="CloudToolLabel" />
+				<mx:HBox styleName="CloudSubTool">
+
+					<!-- BROWSE BRUSH-->
+					<cloudControls:BrushControl id="brushControl"
+						brushSize="{lineThickness.cursorValue}"
+						toolTip="Select Brush model"
+						selectedBrush="{drawStyle.selectedBrush}"
+						change="drawStyle.selectedBrush = brushControl.selectedBrush;
+								lineThickness.cursorValue = drawStyle.selectedBrush.size;
+								drawStyle.lineThickness = lineThickness.cursorValue;
+								onChangeDrawToolState();"/>
+	
+					<mx:HSlider id="hardnessControl" width="120"
+						minimum="0" maximum="100"
+	
+						liveDragging="true" allowTrackClick="true"
+						snapInterval="1"
+						tickInterval="10" tickColor="0x000000" tickThickness="1"
+						labels="['0%','50%','100%']"
+	
+						toolTip="Select the brush hardness from 0% to 100%"
+						dataTipFormatFunction="hardnessDataTipFunc"
+						dataTipOffset="-1"
+	
+						value="{drawStyle.lineHardness}"
+						change="drawStyle.lineHardness = hardnessControl.value;
+								onChangeDrawToolState();"
+						/>
+	
+					<mx:Button id="drawBrushCP" toggle="true"
+						icon="{Globals.g_assets.DrawEraserIcon}"
+						toolTip="Use Brush Control Point"
+						selected="{drawStyle.drawBrushCP}"
+						change="drawStyle.drawBrushCP = drawBrushCP.selected;
+								onChangeDrawToolState();"/>
+				</mx:HBox>
+
+			</mx:VBox>
+
+
+			<!-- LINE DRAW TOOLS -->
+			<mx:VBox id="lineBox" name="{DrawTag.LINE}" width="100%"
+				icon="{Globals.g_assets.DrawLineIcon}"
+				toolTip="Draw Line"
+				styleName="CloudTool"
+				showEffect="cloudToolShow"
+				hideEffect="cloudToolHide">
+
+				<mx:Label text="{this.label}" styleName="CloudToolLabel" />
+				<mx:HBox styleName="CloudSubTool">
+
+					<mx:Button id="drawCurve" toggle="true"
+						height="32"
+						icon="{Globals.g_assets.DrawCurveIcon}"
+						toolTip="Draw Curved Line"
+						selected="{drawStyle.curvedLine}"
+						change="drawStyle.curvedLine = drawCurve.selected;
+								onChangeDrawToolState();"/>
+
+					<mx:Button id="drawRoundEndedLine" toggle="true"
+						height="32"
+						icon="{Globals.g_assets.DrawRoundEndedLineIcon}"
+						toolTip="Draw Round ended Line"
+						selected="{drawStyle.roundEndedLine}"
+						change="drawStyle.roundEndedLine = drawRoundEndedLine.selected;
+								onChangeDrawToolState();"/>
+				</mx:HBox>
+
+			</mx:VBox>
+
+
+			<!-- RECTANGLE DRAW TOOLS -->
+			<mx:VBox id="rectBox" name="{DrawTag.RECTANGLE}" width="100%"
+				icon="{Globals.g_assets.DrawRectIcon}"
+				toolTip="Draw Rectangle"
+				styleName="CloudTool"
+				showEffect="cloudToolShow"
+				hideEffect="cloudToolHide">
+
+				<mx:Label text="{this.label}" styleName="CloudToolLabel" />
+				<mx:HBox styleName="CloudSubTool">
+
+					<mx:Button id="drawFilledRect" toggle="true"
+						height="32"
+						icon="{Globals.g_assets.DrawFilledRectIcon}"
+						toolTip="Draw Filled Rectangle"
+						selected="{drawStyle.filledRect}"
+						change="event.target.selected ? fillColor.visible = true : fillColor.visible = false;
+								drawStyle.filledRect = drawFilledRect.selected;
+								onChangeDrawToolState();"/>
+
+					<cloudControls:DualSliderControl id="drawRoundedRect" 
+						toolTip="Set Rectangle's corners roundness"
+						valueX="{drawStyle.roundedRectX}"
+						valueY="{drawStyle.roundedRectY}"
+						change="drawStyle.roundedRectX = drawRoundedRect.valueX;
+								drawStyle.roundedRectY = drawRoundedRect.valueY;
+								drawController.onParamChanged(false);"/>
+				</mx:HBox>
+
+			</mx:VBox>
+
+
+			<!-- ELLIPSE DRAW TOOLS -->
+			<mx:VBox id="ellipseBox" name="{DrawTag.ELLIPSE}" width="100%"
+				icon="{Globals.g_assets.DrawEllipseIcon}"
+				toolTip="Draw Ellipse"
+				styleName="CloudTool"
+				showEffect="cloudToolShow"
+				hideEffect="cloudToolHide">
+
+				<mx:Label text="{this.label}" styleName="CloudToolLabel" />
+				<mx:HBox styleName="CloudSubTool">
+
+					<mx:Button id="drawFilledEllipse" toggle="true"
+						height="32"
+						icon="{Globals.g_assets.DrawFilledEllipseIcon}"
+						toolTip="Draw Filled Ellipse"
+						selected="{drawStyle.filledEllipse}"
+						change="event.target.selected ? fillColor.visible = true : fillColor.visible = false;
+								drawStyle.filledEllipse = drawFilledEllipse.selected;
+								onChangeDrawToolState();"/>
+				</mx:HBox>
+
+			</mx:VBox>
+
+
+			<!-- POLYLINE DRAW TOOLS -->
+			<mx:VBox id="polylineBox" name="{DrawTag.POLYLINE}" width="100%"
+				icon="{Globals.g_assets.DrawShapeIcon}"
+				toolTip="Draw Polyline"
+				styleName="CloudTool"
+				showEffect="cloudToolShow"
+				hideEffect="cloudToolHide">
+
+				<mx:Label text="{this.label}" styleName="CloudToolLabel" />
+				<mx:HBox styleName="CloudSubTool">
+
+					<mx:ToggleButtonBar id="drawPolylineType" direction="horizontal" 
+						horizontalGap="5" buttonHeight="32"
+						itemClick="onDrawShapeTypeClick(event)">
+					 	<mx:Object name="line" label="L" icon="{Globals.g_assets.DrawLineShapeIcon}" toolTip="Draw Line Polyline" />
+						<mx:Object name="curved" label="C" icon="{Globals.g_assets.DrawCurvedShapeIcon}" toolTip="Draw Curved Polyline" />
+						<!--mx:Object name="freeForm" label="FF" icon="{Globals.g_assets.DrawFreeFormShapeIcon}" toolTip="" /-->	
+					</mx:ToggleButtonBar>
+
+					<mx:Button id="drawFilledPolyline" toggle="true"
+						height="32"
+						icon="{Globals.g_assets.DrawFilledRectIcon}"
+						toolTip="Draw Filled Polyline"
+						selected="{drawStyle.filledPolyline}"
+						change="event.target.selected ? fillColor.visible = true : fillColor.visible = false;
+								drawStyle.filledPolyline = drawFilledPolyline.selected;
+								onChangeDrawToolState();"/>
+				</mx:HBox>
+
+			</mx:VBox>
+
+
+			<!-- CUSTOM SHAPE TOOLS -->
+			<mx:VBox id="shapeBox" name="{DrawTag.SHAPE}" width="100%"
+				icon="{Globals.g_assets.DrawCustomShapeIcon}"
+				toolTip="Draw Shape"
+				styleName="CloudTool"
+				showEffect="cloudToolShow"
+				hideEffect="cloudToolHide">
+
+				<mx:Label text="{this.label}" styleName="CloudToolLabel" />
+				<mx:HBox styleName="CloudSubTool">
+					<!-- BROWSE SHAPE LIBRARY -->
+					<cloudControls:ShapeControl id="shapeControl" toolTip="Select Custom Shape"/>
+
+					<mx:Button id="drawFilledShape" toggle="true"
+						height="32"
+						icon="{Globals.g_assets.DrawFilledRectIcon}"
+						toolTip="Draw Filled Custom Shape"
+						selected="{drawStyle.filledShape}"
+						change="event.target.selected ? fillColor.visible = true : fillColor.visible = false;
+								drawStyle.filledShape = drawFilledShape.selected;
+								onChangeDrawToolState();"/>
+				</mx:HBox>
+
+			</mx:VBox>
+
+
+			<!-- DRAW BUCKET TOOL -->
+			<mx:VBox id="bucketBox" name="{DrawTag.BUCKET}" width="100%"
+				height="32"
+				icon="{Globals.g_assets.DrawBucketIcon}"
+				toolTip="Bucket Fill"
+				styleName="CloudTool"
+				showEffect="cloudToolShow"
+				hideEffect="cloudToolHide">
+
+				<mx:Label text="{this.label}" styleName="CloudToolLabel" />
+				<mx:HBox styleName="CloudSubTool">
+
+				</mx:HBox>
+
+			</mx:VBox>
+
+
+			<!-- DRAW ERASER TOOL 
+			<mx:HBox id="eraserBox" name="Eraser" width="100%"
+				icon="{Globals.g_assets.DrawEraserIcon}"
+				styleName="CloudTool">
+			</mx:HBox>-->				
+
+		</mx:ViewStack>
+
+	</mx:VBox>
+
+
+
+	<!-- BRUSH SIZE, LINE THICKNESS, CONTOUR THICKNESS -->
+	<mx:HBox width="75" height="100%"
+		horizontalAlign="right" paddingRight="0"
+		borderStyle="none" borderSides="left"
+		clipContent="true">
+
+		<cloudControls:ThicknessControl id="lineThickness"
+			label="line thickness"
+			toolTip="Set the line Thickness"
+			cursorType="{ThicknessControl.CURSOR_SQUARE}"
+			cursorColor="{lineColor.selectedColor}"
+			cursorAlpha="{lineColor.selectedAlpha}"
+			cursorGradient="{lineColor.selectedGradient}"
+			cursorValue="{drawStyle.lineThickness}"
+			change="drawStyle.lineThickness = lineThickness.cursorValue;
+					onChangeDrawToolState();"/>
+
+	</mx:HBox>
+
+
+</cloudType:CloudToolPanel>

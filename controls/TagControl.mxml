@@ -1,0 +1,290 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml"
+	width="100%" height="100%"
+	currentState="view"
+
+	creationComplete="onCreationComplete()">
+
+
+	<mx:Metadata>
+        [Event(name="tagClick", type="flash.events.TextEvent")]
+    </mx:Metadata>
+
+
+	<mx:Script>
+    <![CDATA[
+    	import mx.containers.GridItem;
+    	import mx.containers.GridRow;
+    	import mx.controls.LinkButton;
+		import mx.events.ListEvent;
+		import mx.controls.Alert;
+        import mx.managers.CursorManager;
+		import mx.rpc.remoting.RemoteObject;
+        import mx.rpc.events.*;
+
+
+		// RoR RO
+        private var cloudRemObj:RemoteObject = new RemoteObject();
+
+
+		[Bindable]
+		public var metaCloud:XML = null;
+
+
+		private var _tags:XMLList = null;
+
+
+
+
+		public function set tags(tags:XMLList):void
+		{
+			_tags = tags.descendants();
+
+			//tagText.text = "";
+			tagBox.removeAllChildren();
+			for each(var tag:XML in _tags) // for each tag
+			{
+				if(tag.@name == '') // empty tag
+					continue;
+
+				var tagLink:LinkButton = new LinkButton(); // New link button
+				tagLink.label = tag.@name;
+				tagLink.styleName = 'CloudTagLink';
+				tagLink.addEventListener('click', onClickTagLink);
+				tagBox.addChild(tagLink);
+			}
+		}
+
+		[Bindable]
+		public function get tags():XMLList
+		{
+			return _tags;
+		}
+
+
+
+		private function onCreationComplete():void
+		{
+			// Remote object events
+			cloudRemObj.destination = "CloudService";
+        	cloudRemObj.addEventListener("fault", onFault);
+
+        	cloudRemObj.listTags.addEventListener("result", onResultListTags);
+        	cloudRemObj.addTag.addEventListener("result", onResultAddTag);
+        	cloudRemObj.updateTag.addEventListener("result", onResultUpdateTag);
+        	cloudRemObj.deleteTag.addEventListener("result", onResultDeleteTag);
+		}
+
+
+
+		// LIST TAGS
+		public function ListTags():void
+		{
+			if(!metaCloud)
+			{
+				CloudAlert.show('Tags: Invalid Cloud', 'Tag Error');
+				return;
+			}
+
+			var cloudID:String = metaCloud.@id;
+
+			// list comments for this cloud
+			cloudRemObj.listCloudTags(cloudID);
+		}
+
+		private function onResultListTags(event:ResultEvent):void 
+    	{
+    		// Retreive list of tags for this cloud
+			tags = XMLList(event.result);
+
+    	}
+
+
+		// ADD TAG
+		private function onClickAddTag():void
+		{
+			this.setCurrentState('edit');
+			tagInput.text = "";
+		}
+
+		private function onClickPostTag():void
+		{
+			// Create new XML Tag
+			var tagXML:XML = new XML("<tag></tag>");
+			tagXML.@cloudID = metaCloud.@id;
+			tagXML.@userID =  '1'; // TODO
+			tagXML.@name = tagInput.text;
+
+			// Submit Tag XML to backEnd
+			cloudRemObj.addCloudTag(tagXML.toXMLString());
+
+			CursorManager.setBusyCursor();
+		}
+
+		private function onResultAddTag(event:ResultEvent):void 
+    	{
+    		CursorManager.removeBusyCursor(); // Hide the busy cursor
+
+			this.setCurrentState('view');
+
+			ListTags();
+    	}
+
+		private function onClickCancel():void
+		{
+			this.setCurrentState('view');
+		}
+
+
+
+		// EDIT TAG
+		private function onClickEditTag():void
+		{
+			this.setCurrentState('edit');
+		}
+
+		private function onResultUpdateTag(event:ResultEvent):void 
+    	{
+    		CursorManager.removeBusyCursor(); // Hide the busy cursor
+
+    	}
+
+
+
+
+		// REMOVE TAG
+		private function onClickRemoveTag():void
+		{
+			var tagID:String = '1'; //event.tag.@id;
+
+			// Delete Comment on backEnd
+			cloudRemObj.deleteCloudTag(tagID);
+
+			CursorManager.setBusyCursor();
+		}
+
+		private function onResultDeleteTag(event:ResultEvent):void 
+    	{
+    		CursorManager.removeBusyCursor(); // Hide the busy cursor
+
+    		ListTags();
+    	}
+
+
+
+
+		// FAULT
+		private function onFault(event:FaultEvent):void 
+        {
+            CloudAlert.show(event.fault.faultString, 'Tag Error');
+
+			CursorManager.removeBusyCursor(); // Hide the busy cursor
+        }
+
+
+		private function onClickTagLink(event:MouseEvent):void
+		{
+			if(event.currentTarget)
+			{
+				this.dispatchEvent(new TextEvent('tagClick', true, false, event.currentTarget.label));
+			}
+		}
+
+
+		
+
+
+/*
+
+		private function UpdateTagBox():void
+		{
+			tagGrid.removeAllChildren(); // Remove all tag link from the tag box
+
+			var gridRow:GridRow = new GridRow(); 
+			tagGrid.addChild(gridRow); // Add first row
+
+			for each(var tag:String in tagList) // For each tag in the tag list
+			{
+				var tagLink:LinkButton = new LinkButton(); // New link button
+				tagLink.label = tag;
+				tagLink.setStyle('height', 18);
+				tagLink.setStyle('textDecoration', 'underline');
+				tagLink.addEventListener('click', onClickTagLink);
+
+				var gridItem:GridItem = new GridItem(); // Create GridItem
+				gridItem.addChild(tagLink); // Add link to Grid Item
+
+				var lastRow:GridRow = GridRow(tagGrid.getChildAt( tagGrid.numChildren-1 )); 
+				lastRow.addChild(gridItem);
+				lastRow.validateNow();
+				if(lastRow.measuredWidth > this.parent.width) // If Grid row larger than container
+				{
+					lastRow.removeChild(gridItem); // Remove Grid Item just added
+
+					var newRow:GridRow = new GridRow(); // Create new Grid row
+					newRow.addChild(gridItem); // add new Grid Item
+
+					tagGrid.addChild(newRow); // Add new Grid row
+				}
+
+			}
+		}
+
+*/
+
+	
+
+	]]>
+    </mx:Script>
+
+
+	<mx:Style>
+
+		.CloudTagLink
+		{
+			paddingTop: 0; paddingLeft: 0; paddingRight: 0; paddingBottom: 0;
+		   	fontSize: 10;
+  		}
+
+	</mx:Style>
+
+
+
+	<!-- TAG BOX-->
+	<mx:HBox id="tagBox" width="100"
+		 horizontalScrollPolicy="off" verticalScrollPolicy="off"
+		 horizontalAlign="left" verticalAlign="middle"
+		 horizontalGap="0" verticalGap="0">
+		
+	</mx:HBox>
+
+	<!-- VIEW BOX -->
+	<mx:HBox id="viewBox" width="100%"
+		visible="true" includeInLayout="{viewBox.visible}">
+		<mx:Button id="addTagBtn" label="Add Tag" click="onClickAddTag();" />
+		<mx:Button label="Edit" click="onClickEditTag();" />
+		<mx:Button label="Remove" click="onClickRemoveTag();" />
+	</mx:HBox>
+
+	<!-- EDIT BOX -->
+	<mx:HBox id="editBox" width="100%"
+		visible="false" includeInLayout="{editBox.visible}">
+		<mx:TextInput id="tagInput" width="100" />
+		<mx:Button id="postTagBtn" label="Add Tag" click="onClickPostTag();" />
+		<mx:Button id="cancelTagBtn" label="Cancel" click="onClickCancel();" />
+	</mx:HBox>
+
+
+	<!-- TAGS CONTROL STATES -->
+	<mx:states>
+		<mx:State name="view">
+			
+		</mx:State>
+
+		<mx:State name="edit">
+			<mx:SetProperty target="{viewBox}" name="visible" value="false" />
+			<mx:SetProperty target="{editBox}" name="visible" value="true" />
+		</mx:State>
+	</mx:states>
+	
+</mx:VBox>

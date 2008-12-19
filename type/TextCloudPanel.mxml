@@ -1,0 +1,353 @@
+<?xml version="1.0" encoding="utf-8"?>
+<cloudType:CloudToolPanel xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:cloudType="type.*" xmlns:cloudControls="controls.*"
+	label="Text Cloud" 
+	creationComplete="onCreationComplete()">
+
+
+	<mx:Script>
+    <![CDATA[
+    	import mx.controls.Label;
+    	import mx.events.ItemClickEvent;
+    	import mx.controls.textClasses.TextRange;
+
+    	import core.Cloud;
+    	import type.TextCloud;
+    	import type.text.TextStyle;
+
+
+		[Bindable]
+		private var textCloud:TextCloud = null;
+
+		[Bindable]
+		private var textStyle:TextStyle = null;
+
+
+
+		private function onCreationComplete():void
+		{
+			textToolViewStack.selectedIndex = 0; // reselect font attribute..
+			selectedTool = "";
+		}
+
+		public function SetCloud(sCloud:Cloud):void
+		{
+			textCloud = TextCloud(sCloud);
+
+			textStyle = textCloud.textStyle;
+
+			// Set initial values
+			fontSize.cursorType= ThicknessControl.CURSOR_CIRCLE;
+			fontSize.cursorValue = textStyle.fontSize;
+
+			onChangeFont(); // for the first time
+		}
+
+
+		// Look at TextRange!!
+
+		private function onClickTextToolBar(event:ItemClickEvent):void
+		{
+			selectedTool = textToolViewStack.selectedChild.name;
+			this.label = selectedTool;
+		}
+
+
+		// Changed something in the Text Cloud Panel
+		private function onChangeTextToolState():void
+		{
+			this.validateNow();
+
+			//if(textCloud)
+			//	textCloud.UpdateBoundingShape();
+		}
+
+
+		// Changed Font in the Font Control
+		private function onChangeFont():void
+		{
+			onChangeTextToolState();
+
+			if(textStyle && fontControl.selectedFont)
+			{
+				// Set font family
+				textStyle.fontFamily = fontControl.selectedFont.name; 
+
+				// enable or disable bold
+				textBold.enabled = (fontControl.selectedFont.fontStyle == FontStyle.BOLD) ||
+								   (fontControl.selectedFont.fontStyle == FontStyle.BOLD_ITALIC);
+				if(!textBold.enabled)
+					textBold.selected = false;
+
+				// enable or disable italic
+				textItalic.enabled = (fontControl.selectedFont.fontStyle == FontStyle.ITALIC) ||
+									 (fontControl.selectedFont.fontStyle == FontStyle.BOLD_ITALIC);
+				if(!textItalic.enabled)
+					textItalic.selected = false;
+
+			}
+
+			if(textCloud)
+			{
+				//textCloud.UpdateIconImage(); // update icon
+			}
+		}
+
+
+
+		private function GetIndex(items:Array, itemName:String):int
+		{
+			var index:uint = 0;
+			for each(var item:Object in items)
+			{
+				if(itemName == item.name)
+					return index;
+
+				index++;
+			}
+			return 0;
+		}
+
+
+		// Use DisplacementMapFilter for text warp
+
+
+		private function dataTipFuncWarp(val:Number):String
+		{
+			return val.toFixed(0).toString() + '%';
+		}
+		
+
+		private function onChangeWarpSlider(event:Event):void
+		{
+			
+		}
+
+		// Convert Text Cloud to Image Cloud
+		private function onClickConvertToImageCloud():void
+		{
+			
+		}
+
+	]]>
+    </mx:Script>
+
+
+
+	<!-- COLOR & ALPHA TEXT TOOLS -->
+	<mx:Canvas width="75" height="100%"
+		 borderStyle="none" borderSides="right">
+
+		<cloudControls:ColorControl id="backColor"
+			width="40" height="40" x="8" y="8"
+		 	title="text background"
+		 	toolTip="Select the Text Background Color"
+		 	gradientEnabled="false"
+		 	selectedColor="{textStyle.backgroundColor}"
+		 	selectedAlpha="{textStyle.backgroundAlpha}"
+		 	change="textStyle.backgroundColor = backColor.selectedColor;
+		 			textStyle.backgroundAlpha = backColor.selectedAlpha;
+		 			onChangeTextToolState();"/>
+
+		<cloudControls:ColorControl id="textColor"
+			width="40" height="40" x="24" y="24"
+		 	title="text"
+		 	toolTip="Select the Text Color"
+		 	gradientEnabled="false"
+		 	selectedColor="{textStyle.color}"
+		 	selectedAlpha="{textStyle.alpha}"
+		 	change="textStyle.color = textColor.selectedColor;
+		 			textStyle.alpha = textColor.selectedAlpha;
+					onChangeTextToolState();"/>
+
+		<mx:Button id="convertToImageCloudBtn" x="0" y="70"
+			width="48" height="24"
+			toolTip="Convert Text Cloud to Image Cloud"
+			click="onClickConvertToImageCloud()"/>
+
+	</mx:Canvas>
+
+
+
+	<!-- TEXT TOOL PANEL -->
+	<mx:VBox id="textToolBox" width="100%" height="100%"
+		horizontalAlign="center" verticalAlign="top"
+		verticalGap="0">
+
+
+		<!-- TEXT TOOLBAR -->
+		<mx:TabBar id="textToolBar"
+			dataProvider="{textToolViewStack}"
+			direction="horizontal"
+			tabWidth="42" tabHeight="32"
+			buttonMode="true"
+
+			styleName="CloudToolBar"
+			tabStyleName="CloudToolTab"
+			buttonStyleName="CloudToolButton"
+
+			itemClick="onClickTextToolBar(event)"/>
+
+
+		<!-- TEXT TOOLS VIEWSTACK (selectedIndex: taller child)-->
+		<mx:ViewStack id="textToolViewStack" width="100%" height="100%"
+			 creationPolicy="all" selectedIndex="0"
+			 styleName="CloudViewStack">
+
+
+			<!-- FONT ATTRIBUTES -->
+			<mx:VBox id="fontAttributeBox" name="Font Attributes" width="100%"
+				icon="{Globals.g_assets.NewTextCloudIcon}"
+				toolTip="Font attributes"
+				styleName="CloudTool"
+				showEffect="cloudToolShow"
+				hideEffect="cloudToolHide">
+
+				<mx:Label text="{this.label}" styleName="CloudToolLabel" />
+				<mx:HBox styleName="CloudSubTool">
+
+					<!-- FONT CONTROL -->
+					<cloudControls:FontControl id="fontControl" 
+						selectedFontName="{textStyle.fontFamily}"
+						change="onChangeFont();"/>
+
+					<!-- FONT BOLD -->
+					<mx:Button id="textBold" toggle="true" label="B" fontWeight="bold" width="24"
+						toolTip="Set the Text in Bold"
+						selected="{textStyle.fontWeight == 'bold'}"
+						change="textStyle.fontWeight = (event.target ? (event.target.selected?'bold':'normal') : 'normal');
+								onChangeTextToolState();"/>
+	
+					<!-- FONT ITALIC -->
+					<mx:Button id="textItalic" toggle="true" label="I" fontStyle="italic" width="24"
+						toolTip="Set the Text in Italic"
+						selected="{(textStyle.fontStyle == 'italic')}"
+						change="textStyle.fontStyle = (event.target ? (event.target.selected?'italic':'normal') : 'normal');
+								onChangeTextToolState();"/>
+	
+					<!-- FONT UNDERLINE -->
+					<mx:Button id="textUnderline" toggle="true" label="U" textDecoration="underline" width="24"
+						toolTip="Underline the Text"
+						selected="{(textStyle.textDecoration == 'underline')}"
+						change="textStyle.textDecoration = (event.target ? (event.target.selected?'underline':'none') : 'normal');
+								onChangeTextToolState();"/>
+
+				</mx:HBox>
+			</mx:VBox>
+
+
+			<!-- TEXT ATTRIBUTES -->
+			<mx:VBox id="textAttributeBox" name="Text Attributes" width="100%"
+				icon="{Globals.g_assets.AlignCenterIcon}"
+				toolTip="Text attributes"
+				styleName="CloudTool"
+				horizontalGap="3"
+				showEffect="cloudToolShow"
+				hideEffect="cloudToolHide">
+
+				<mx:Label text="{this.label}" styleName="CloudToolLabel" />
+				<mx:HBox styleName="CloudSubTool">
+
+					<!-- TEXT ALIGN -->
+					<mx:ToggleButtonBar id="textAlign" direction="horizontal"
+						buttonWidth="28" buttonHeight="28"
+						selectedIndex="{GetIndex(alignTypes, textStyle.textAlign)}"
+						itemClick="textStyle.textAlign = (event.item ? event.item.name : '');
+								   onChangeTextToolState();">
+					 	<mx:dataProvider>
+						 	<mx:Array id="alignTypes">
+						 		<mx:Object name="left" icon="{Globals.g_assets.AlignLeftIcon}" toolTip="Align the Text to the Left" />
+								<mx:Object name="center" icon="{Globals.g_assets.AlignCenterIcon}" toolTip="Align the Text to the Center" />
+								<mx:Object name="right" icon="{Globals.g_assets.AlignRightIcon}" toolTip="Align the Text to the Right" />
+						 	</mx:Array>
+					 	</mx:dataProvider>
+					</mx:ToggleButtonBar>
+
+					<!-- TEXT INDENT -->
+					<mx:Label text="Indent:" />
+					<mx:NumericStepper id="textIndentNum" width="50" maxChars="3"
+						minimum="0" maximum="30"
+						toolTip="Set the Text Indentation (Space Left of the Text)"
+						value="{textStyle.textIndent}"
+						change="textStyle.textIndent = textIndentNum.value;
+								onChangeTextToolState();"/>
+
+					<!-- LEADING (space between lines) -->
+					<mx:Label text="Leading:" />
+					<mx:NumericStepper id="textLeadingNum" width="50" maxChars="3"
+						minimum="0" maximum="30"
+						toolTip="Set the Text Leading (Space between Lines)"
+						value="{textStyle.leading}"
+						change="textStyle.leading = textLeadingNum.value;
+								onChangeTextToolState();"/>
+
+				</mx:HBox>
+			</mx:VBox>
+
+
+			<!-- TEXT WARP -->
+			<mx:VBox id="warpBox" name="Text Warp" width="100%"
+				icon="{Globals.g_assets.WarpIcon}"
+				toolTip="Text Warp"
+				styleName="CloudTool"
+				horizontalGap="3"
+				showEffect="cloudToolShow"
+				hideEffect="cloudToolHide">
+
+				<mx:Label text="{this.label}" styleName="CloudToolLabel" />
+				<mx:HBox styleName="CloudSubTool">
+
+					<!-- WARP TEXT -->
+					<mx:Label text="Warp:" />
+					<cloudControls:WarpControl id="warpControl" />
+	
+					<!-- HORIZONTAL SLIDER -->
+					<mx:HSlider id="warpSlider"
+						width="120"
+						minimum="0" maximum="100"
+						value="50"
+						snapInterval="1"
+	
+						liveDragging="true" allowTrackClick="true"
+						tickInterval="10" tickColor="0x000000" tickThickness="1"
+						labels="['0%','50%','100%']"
+	
+						toolTip="Select the warp value from 0 to 100%"
+						dataTipFormatFunction="dataTipFuncWarp"
+						dataTipOffset="-2"
+	
+						change="onChangeWarpSlider(event)"/>
+
+				</mx:HBox>
+			</mx:VBox>
+
+
+		</mx:ViewStack>
+
+	</mx:VBox>
+
+
+
+
+	
+	<!-- FONT SIZE -->
+	<mx:HBox width="75" height="100" 
+		horizontalAlign="right" paddingRight="10"
+		borderStyle="none" borderSides="left">
+
+		<cloudControls:ThicknessControl id="fontSize"
+			minimum="1" maximum="60"
+			toolTip="Select the Font Size from 1 to 60"
+			label="Font Size"
+			cursorType="{ThicknessControl.CURSOR_CIRCLE}"
+			cursorColor="{textColor.selectedColor}"
+			cursorAlpha="{textColor.selectedAlpha}"
+			cursorFont="{textStyle.fontFamily}"
+			cursorValue="{textStyle.fontSize}"
+			change="if(!textStyle){return;}
+					textStyle.fontSize = fontSize.cursorValue;
+					onChangeTextToolState();"/>
+
+	</mx:HBox>
+	
+
+</cloudType:CloudToolPanel>

@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml"
+	autoLayout="false"
+
+	creationComplete="onCreationComplete()"
+	rollOver="onRollOverZoom()"
+ 	rollOut="onRollOutZoom()">
+
+
+	<mx:Script>
+    <![CDATA[
+ 
+    	import mx.core.UIComponent;
+		import mx.effects.Zoom;
+		import mx.binding.utils.BindingUtils;
+		import mx.controls.Alert;
+		import mx.events.EffectEvent;
+		import mx.events.SliderEvent;
+
+		import core.CanvasCloud;
+
+
+		[Bindable]
+		public var panControl:PanControl = null;
+
+
+		[Bindable]
+		public var target:CanvasCloud = null;
+
+
+		private const minZoomFactor:Number = 0.50;
+		private const maxZoomFactor:Number = 3;
+		private const zoomFactorDelta:Number = 0.25;
+
+
+		[Bindable]
+        public var zoomFactor:Number = 1.0;
+        private var oldZoomFactor:Number = 1.0;
+
+		private var zoomBackFactor:Number = 1.0;
+
+
+
+    	private function onCreationComplete():void
+        {
+            BindingUtils.bindSetter(handleZoomFactorChange, this, "zoomFactor" );
+            zoomFactor = 0.999;
+        }
+
+
+		// MouseWheel the CenterPanel
+		public function mouseWheel(delta:Number):void
+		{
+			var scrollDirection:Number = delta <= 0 ? -1.0 : 1.0;
+
+			zoomFactor = EnforceMinMax(zoomFactor + scrollDirection * zoomFactorDelta);
+		}
+
+		// Clicked the Zoom slider track
+		private function onClickZoomSlider():void
+		{
+			oldZoomFactor = zoomSlider.value;
+		}
+
+		// End of automatic slide
+ 		private function onChangeZoomSlider(event:SliderEvent):void
+     	{
+     		handleZoomFactorChange(event.value);
+     		zoomFactor = event.value;
+     	}
+
+
+     	// Click ZoomIn
+		private function onClickMagnify():void
+		{
+			zoomFactor = EnforceMinMax(zoomFactor + zoomFactorDelta);
+		}
+
+		// Click ZoomOut
+		private function onClickMinify():void
+		{
+			zoomFactor = EnforceMinMax(zoomFactor - zoomFactorDelta);
+		}
+
+
+		private function EnforceMinMax(newZoomFactor:Number):Number
+		{
+			newZoomFactor = Math.min(maxZoomFactor, newZoomFactor); // Enforce width and height limits
+			newZoomFactor = Math.max(minZoomFactor, newZoomFactor);
+
+			return newZoomFactor;
+		}
+
+
+		private function onRollOverZoom():void
+		{
+			//fadeIn.end();
+			//fadeIn.play();
+		}
+
+		private function onRollOutZoom():void
+		{
+			//fadeOut.end();
+		    //fadeOut.play();
+		}
+
+
+     	// ZOOM EVENTS
+        // *********************************** 
+        private function handleZoomFactorChange(newZoomFactor:Number):void
+        {
+			if(newZoomFactor == oldZoomFactor)
+				return;
+
+			newZoomFactor = EnforceMinMax(newZoomFactor); // Enforce width and height limits
+
+			zoomPanel.originX = target.usWidth / 2; // Set origin 
+			zoomPanel.originY = target.usHeight / 2; 
+
+			zoomPanel.zoomWidthFrom = oldZoomFactor; // Set old Width and Height factors
+			zoomPanel.zoomHeightFrom = oldZoomFactor;
+
+			zoomPanel.zoomWidthTo = newZoomFactor; // Set new Width and Height factors
+			zoomPanel.zoomHeightTo = newZoomFactor;
+
+			zoomPanel.end();
+			zoomPanel.play([target]); // Zoom on!
+
+			oldZoomFactor = newZoomFactor; // new becomes old
+
+			// Update Zoom Label
+			zoomLabel.y = zoomSlider.y + zoomSlider.height - 
+				(zoomSlider.value / zoomSlider.maximum) * zoomSlider.height - 3;
+
+     		zoomLabel.text = Math.floor(zoomSlider.value * 100) + '%';
+        }
+
+
+		// End Zoom Panel
+		private function onZoomPanelEnd():void
+		{
+			// Update the pan Control's view icon
+       		panControl.DrawPanView();
+  		}
+
+
+		private function dataTipFunc(val:Number):String
+		{
+			return Math.floor(val * 100) + '%';
+		}
+
+
+	]]>
+    </mx:Script>
+
+
+	<!-- ZOOM, way Faster with suspendBackgroundProcessing, drawbacks? -->
+	<mx:Zoom id="zoomPanel" suspendBackgroundProcessing="true" 
+		 effectEnd="onZoomPanelEnd()"/>
+
+
+	<mx:VBox id="zoomBox" horizontalAlign="right" verticalGap="0">
+
+	    <mx:Image source="{Globals.g_assets.MagnifyIcon}" click="onClickMagnify()"
+	    	 toolTip="Zoom-In"/>
+
+	    <mx:VSlider id="zoomSlider" x="0" height="150" 
+	    	minimum="{minZoomFactor}" maximum="{maxZoomFactor}" 
+	    	value="{zoomFactor}"
+	    	labels="['']"
+	    	tickInterval="{zoomFactorDelta}" snapInterval="{zoomFactorDelta}" 
+	    	liveDragging="false" allowTrackClick="true"
+	    	showDataTip="true"
+	    	dataTipFormatFunction="dataTipFunc"
+	    	dataTipOffset="0"
+
+	    	click="onClickZoomSlider();"
+	    	thumbPress="CloudCursor.SetCursor(CloudCursor.TRANSLATE_VERT);"
+			thumbRelease="CloudCursor.SetCursor(CloudCursor.NORMAL);"
+	    	change="onChangeZoomSlider(event);"
+	    	/>
+
+	    <mx:Image source="{Globals.g_assets.MinifyIcon}" click="onClickMinify()"
+	    	 toolTip="Zoom-Out"/>
+
+	</mx:VBox>
+
+
+	<mx:Label id="zoomLabel" x="{zoomSlider.x - 25}" 
+		width="40"
+		text="100%"
+		includeInLayout="false" mouseEnabled="false" mouseChildren="false"
+		color="0x999999"
+		textAlign="right"/>
+
+
+	<mx:Fade id="fadeIn" target="{zoomBox}" alphaFrom="0.25" alphaTo="1.0" duration="200" />
+	<mx:Fade id="fadeOut" target="{zoomBox}" alphaFrom="1.0" alphaTo="0.25" duration="200" />
+
+</mx:Canvas>

@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:cloudPanels="panels.*"
+	width="400" height="300"
+	titleIcon="{Globals.g_assets.TriCloudIcon16}"
+	title="About TriCloud"
+	layout="vertical"
+	horizontalScrollPolicy="off" verticalScrollPolicy="off"
+	showCloseButton="true"
+
+	styleName="CloudDialog"
+	titleStyleName="CloudDialogTitle"
+	horizontalAlign="center" verticalAlign="middle"
+
+	creationComplete="onCreationComplete()"
+	close="onClickOk()">
+
+
+	<mx:Script>
+    <![CDATA[
+
+		import mx.managers.PopUpManager;
+
+
+		// Static instance, singleton
+		public static const aboutDialog:AboutDialog = new AboutDialog();
+
+
+		private function onCreationComplete():void
+    	{
+			// Set the Right Click menu for this Dialog
+   			var rightClickMenu:RightClickMenu = new RightClickMenu(this.title);
+   			this.contextMenu = rightClickMenu.triCloudContextMenu;
+    	}
+
+		private function onClickOk():void
+		{
+			PopUpManager.removePopUp(aboutDialog);
+		}
+
+ 	]]>
+    </mx:Script>
+
+
+	<!-- ABOUT INFO -->		
+	<mx:Form id="aboutInfo"
+		horizontalScrollPolicy="off" verticalScrollPolicy="off"
+		verticalGap="3"
+		paddingLeft="5" paddingTop="15" paddingBottom="5" paddingRight="5">
+
+		<mx:FormHeading label="TriCloud" />
+
+		<mx:FormItem label="Version:">
+			<mx:Label text="{Globals.g_version}" />
+		</mx:FormItem>
+
+		<mx:FormItem label="Release:">
+			<mx:Label text="{new Date()}" />
+		</mx:FormItem>
+
+		<mx:FormItem label="Author:">
+			<mx:Label text="Jean-Rene Bedard" />
+		</mx:FormItem>
+	</mx:Form>
+
+	<mx:Label text="Copyright TriCloud 2007 - All Rights Reserved - Patent Pending." />
+
+	<mx:LinkButton id="onlineAbout" label="Online About" click="navigateToURL(new URLRequest('/about'), 'TriCloud');" />
+
+
+    <mx:ControlBar>
+		<mx:Button id="okButton" label="Ok" click="onClickOk()" styleName="OkButton" />		
+	</mx:ControlBar>
+    
+</mx:TitleWindow>

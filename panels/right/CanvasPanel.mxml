@@ -1,0 +1,452 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:panels="panels.*" xmlns:cloudControls="controls.*"
+	width="100%" height="100%"
+	horizontalScrollPolicy="auto" verticalScrollPolicy="auto"
+	verticalAlign="top"
+	creationComplete="onCreationComplete()">
+
+
+  	<mx:Script>
+	<![CDATA[
+		import mx.core.BitmapAsset;
+		import mx.core.SpriteAsset;
+		import mx.binding.utils.*;
+		import mx.controls.Button;
+
+		import core.CanvasCloud;
+		import core.Cloud;
+		import events.CanvasEvent;
+		import events.CloudEvent;
+		import CloudEngine;
+
+
+		private var canvasPanelHeader:Button = null;
+
+
+		[Bindable]
+		private var canvas:CanvasCloud = null;
+
+		[Bindable]
+		private var m_cloud:Cloud = null;
+
+		[Bindable]
+		private var autoSize:Boolean = false;
+
+
+
+		[Bindable]
+		private var canvas_width:uint = 0;
+
+		[Bindable]
+		private var canvas_height:uint = 0;
+
+
+
+  		private function onCreationComplete():void
+  		{
+  			// Listen for selected canvas: has to be here and not in Init.. its bad to rely on init order..
+			CloudEngine.GetInstance().GetCanvasController().addEventListener("selectCanvas", onChangeCanvas);
+		}
+
+
+		public function init(canvasPanelHeader:Button):void
+		{
+			this.canvasPanelHeader = canvasPanelHeader;
+
+			canvasPanelHeader.setStyle('cornerRadius', 30);
+
+			// Listen for selected cloud
+  			CloudEngine.GetInstance().GetCloudController().addEventListener("selectCloud", onChangeCloud);
+ 
+  			UpdateIconImage();
+		}
+
+
+		private function onChangeCanvas(event:CanvasEvent):void
+		{
+			canvas = event.m_canvas;
+
+			BindingUtils.bindSetter(onCanvasSizeChanged, canvas, "width");
+			BindingUtils.bindSetter(onCanvasSizeChanged, canvas, "height");
+		}
+
+		private function onCanvasSizeChanged(value:Object):void
+		{
+			canvas_width = uint(canvas.usWidth.toFixed(0));
+			canvas_height = uint(canvas.usHeight.toFixed(0));
+
+			UpdateIconImage();
+		}
+
+
+		private function onChangeCloud(event:CloudEvent):void
+		{
+			m_cloud = event.m_cloud;
+
+ 			BindingUtils.bindSetter(onCloudChanged, m_cloud, "x");
+			BindingUtils.bindSetter(onCloudChanged, m_cloud, "y");
+			BindingUtils.bindSetter(onCloudChanged, m_cloud, "width");
+			BindingUtils.bindSetter(onCloudChanged, m_cloud, "height"); 
+		}
+
+		private function onCloudChanged(number:Number):void
+		{
+			UpdateIconImage();
+		
+		}
+
+
+		private function onChangeCanvasSize(dim:String, size:Number):void
+		{
+			if(!canvas)
+				return;
+
+			if(dim == 'width')
+			{
+				var oldWidth:Number = canvas.usWidth;
+				canvas.usWidth = size;
+
+				if(contrainProp.selected)
+					canvas.usHeight = (canvas.usHeight / oldWidth) * size; 
+			}
+			else
+			{
+				var oldHeight:Number = canvas.usHeight;
+				canvas.usHeight = size;
+
+				if(contrainProp.selected)
+					canvas.usWidth = (canvas.usWidth / oldHeight) * size; 
+			}
+
+			UpdateIconImage();
+		}
+
+
+		private function onChangeAutoResize():void
+		{
+			
+		
+		}
+
+
+		private function onChangeTransCheck():void
+		{
+			if(transparencyCheck.selected) // background transparent
+			{
+				backgoundColor.selectedAlpha = 0.0;
+			}
+			else // background non-transparent
+			{
+				backgoundColor.selectedAlpha = 1.0;
+			}
+		}
+		
+
+
+
+private var bmpData:BitmapData = new BitmapData(48-1, 48-1, false, 0);
+						
+
+		// UPDATE CANVAS miniView
+		// TODO: Make this better!, precompute a matrix...
+		// PRECOMPUTE A LOT OF THIS!
+		// PERFORMANCE HOG
+		// TODO: cloud Rotation
+		public function UpdateIconImage():void
+		{
+			if(!canvasPanelHeader)
+				return;
+
+			const iconSize:int = 48;
+			var canBound:Rectangle = new Rectangle();
+
+			var canvasRatio:Number = canvas.usWidth / canvas.usHeight;
+			if(canvasRatio >= 1.0) // canvas' width larger or equal to height
+			{
+				canBound.left = 4;
+				canBound.width = iconSize-1;
+
+				var newHeight:uint = (iconSize / canvasRatio); // compute new canvas height
+				canBound.top = 4 + (iconSize - newHeight)/2;
+				canBound.height = newHeight-1;
+			}
+			else // canvas' height taller than wide
+			{
+				canBound.top = 4;
+				canBound.height = iconSize-1;
+
+				var newWidth:uint = (iconSize * canvasRatio); // compute new canvas width
+				canBound.left = 4 + (iconSize - newWidth)/2;
+				canBound.width = newWidth-1;
+			}
+
+
+			// Draw Canvas
+			canvasPanelHeader.graphics.clear();
+
+
+			// Draw selected Cloud inside Canvas
+			if(CloudEngine.GetInstance().GetCloudController())
+			{
+				var sCloud:Cloud = CloudEngine.GetInstance().GetCloudController().GetCloud();
+				if(sCloud)
+				{
+					var rec:Rectangle = sCloud.getBounds(canvas); // Cloud bound
+					var recWidth:uint = rec.width;
+					var recHeight:uint = rec.height;
+
+					if(canvasRatio >= 1.0) // canvas' width larger or equal to height
+					{
+						rec.left /= canvas.usWidth;		
+						rec.left *= canBound.width;
+						rec.left += canBound.left + 1;
+
+						rec.width = recWidth / canvas.usWidth;
+						rec.width *= canBound.width - 1;
+
+						rec.height /= canvas.usHeight;
+						var newCHeight:uint = (rec.height * canBound.height); // compute new cloud height
+						rec.top /= canvas.usHeight;
+						rec.top *= canBound.height;
+						rec.top += canBound.top + 1;
+						rec.height = newCHeight - 1;
+					}
+					else // canvas' height taller than wide
+					{
+						rec.top /= canvas.usHeight;		
+						rec.top *= canBound.height;
+						rec.top += canBound.top + 1;
+
+						rec.height = recHeight / canvas.usHeight;
+						rec.height *= canBound.height - 1;
+
+						rec.width /= canvas.usWidth;
+						var newCWidth:uint = (rec.width * canBound.width); // compute new cloud height
+						rec.left /= canvas.usWidth;
+						rec.left *= canBound.width;
+						rec.left += canBound.left + 1;
+						rec.width = newCWidth - 1;
+					}
+
+					// Clip cloud to canvas
+					rec = rec.intersection(canBound);
+
+					// Draw Cloud
+					canvasPanelHeader.graphics.lineStyle(1, 0x0000FF, 1.0);
+					canvasPanelHeader.graphics.beginFill(0xA0A0A0, 0.0);
+					canvasPanelHeader.graphics.drawRect(rec.left,  rec.top,
+														rec.width, rec.height);
+					canvasPanelHeader.graphics.endFill();
+
+/*
+					else // Cloud has Rotation
+					{
+						
+						var radVal:Number = Math.PI * sCloud.rotation / 180;
+
+						// Rotation offset
+						var rotOffset:Point = new Point(); 
+						rotOffset.x = -sCloud.width/2 * Math.cos(radVal) + sCloud.height/2 * Math.sin(radVal);
+						rotOffset.y = -sCloud.width/2 * Math.sin(radVal) - sCloud.height/2 * Math.cos(radVal);
+
+						// Transform Matrix
+						var transMatrix:Matrix = new Matrix();
+
+						transMatrix.rotate(radVal);
+						//transMatrix.translate(rotOffset.x, rotOffset.y);
+						transMatrix.scale((sCloud.width / canvas.width) * (canBound.width / sCloud.width),
+										  (sCloud.height / canvas.height) * (canBound.height / sCloud.height));
+ 
+						//cloudSprite.transform.matrix = transMatrix;
+						
+						
+						
+						//cloudSprite.cloudSprite
+						cloudSprite.transform.matrix.scale(0.5, 0.5);
+						
+						var drawMatrix:Matrix = new Matrix();
+						//drawMatrix.scale(1, 0.5);
+						drawMatrix.rotate(radVal);
+						drawMatrix.translate((sCloud.x / canvas.width) * canBound.width + 4,
+											 (sCloud.y / canvas.height) * canBound.height + 4);
+
+				
+						//cloudSprite
+						//bmpData.dispose();
+						
+						
+						bmpData.draw(cloudSprite, drawMatrix, null, null, canBound, false);
+						
+						
+						
+						// Transformed Point
+						var topLeft:Point = transMatrix.transformPoint(new Point(sCloud.x, sCloud.y));
+						var topRight:Point = transMatrix.transformPoint(new Point(sCloud.x + sCloud.width, sCloud.y));
+						var bottomLeft:Point = transMatrix.transformPoint(new Point(sCloud.x, sCloud.y + sCloud.height));
+						var bottomRight:Point = transMatrix.transformPoint(new Point(sCloud.x + sCloud.width, sCloud.y + sCloud.height));
+
+						// Draw Cloud
+						
+						
+						canvasPanelHeader.graphics.beginBitmapFill(bmpData, null, false, false);
+						
+					
+						canvasPanelHeader.graphics.lineStyle(1, 0x0000FF, 1.0);
+
+						canvasPanelHeader.graphics.moveTo(topLeft.x, topLeft.y);
+						canvasPanelHeader.graphics.lineTo(topRight.x, topRight.y);
+						canvasPanelHeader.graphics.lineTo(bottomRight.x, bottomRight.y);
+						canvasPanelHeader.graphics.lineTo(bottomLeft.x, bottomLeft.y);
+						canvasPanelHeader.graphics.lineTo(topLeft.x, topLeft.y);
+						
+					}
+*/
+				}
+			}
+
+			// erase cloud borders
+			canvasPanelHeader.graphics.lineStyle(0, 0x000000, 1.0);
+			canvasPanelHeader.graphics.drawRect(canBound.left,  canBound.top,
+												canBound.width, canBound.height);
+
+			canvasPanelHeader.graphics.endFill();
+		}
+
+
+
+
+	]]>
+	</mx:Script>
+
+	<mx:Style>
+
+		.CanvasForm
+		{
+			background-color: #F5F5F5; background-alpha: 1.0;
+			horizontalAlign: left; verticalAlign: top;
+			horizontalGap:5; verticalGap:5;
+			paddingTop: 5; paddingLeft: 5; paddingRight: 5; paddingBottom: 5;
+		   	borderStyle: solid; borderColor: #C0C0EE; borderThickness: 1; borderSides: bottom;
+  		}
+
+	</mx:Style>
+
+
+	<!-- CANVAS DIMENSIONS -->
+	<mx:Form width="100%"
+		indicatorGap="5"
+		styleName="CanvasForm">
+
+		<!-- CANVAS WIDTH -->
+		<mx:FormItem label="Width:">
+		<mx:NumericStepper id="canvasWidth" width="60" maxChars="4"
+			minimum="{canvas.minWidth}" maximum="{canvas.maxWidth}"
+			toolTip="Set Canvas Width"
+			value="{canvas_width}"
+			change="onChangeCanvasSize('width', event.value);"/>
+		</mx:FormItem>
+
+		<!-- CANVAS HEIGHT -->
+		<mx:FormItem label="Height:">
+		<mx:NumericStepper id="canvasHeight" width="60" maxChars="4"
+			minimum="{canvas.minHeight}" maximum="{canvas.maxHeight}"
+			toolTip="Set Canvas Height"
+			value="{canvas_height}"
+			change="onChangeCanvasSize('height', event.value);"/>
+		</mx:FormItem>
+
+
+		<!-- DEBUG: CANVAS SCALE X -->
+		<mx:FormItem label="Debug ScaleX:">
+		<mx:TextInput id="canvasScaleX" width="60" maxChars="4"
+			text="{canvas.scaleX.toFixed(3)}"
+			/>
+		</mx:FormItem>
+
+		<!-- DEBUG: CANVAS SCALE Y -->
+		<mx:FormItem label="Debug ScaleY:">
+		<mx:TextInput id="canvasScaleY" width="60" maxChars="4"
+			text="{canvas.scaleY.toFixed(3)}"
+			/>
+		</mx:FormItem>
+	
+
+
+
+		<!-- CONSTRAIN PROPORTIONS -->
+		<mx:FormItem label="Constrain Proportions:">
+			<mx:CheckBox id="contrainProp" 
+				toolTip="Constrain proportions on canvas resizing"
+				selected="true" />
+		</mx:FormItem>
+
+		<!-- AUTO RESIZE -->
+		<mx:FormItem label="Auto Resize:">
+			<mx:CheckBox id="autoResize" 
+				toolTip="Automatic resizing according to content"
+				selected="{autoSize}" 
+				change="autoSize = autoResize.selected"/>
+		</mx:FormItem>
+
+	</mx:Form>
+
+
+	<!-- CANVAS COLOR AND ALPHA -->
+	<mx:Form width="100%"
+		indicatorGap="5"
+		styleName="CanvasForm">
+
+		<mx:FormHeading label="Color" />
+
+		<!-- CANVAS BACKGROUND COLOR & ALPHA -->
+		<mx:FormItem label="background:">
+			<cloudControls:ColorControl id="backgoundColor"
+				width="40" height="40"
+				title="Canvas Background color"
+			 	toolTip="Select the Canvas Background Color"
+			 	selectedColor="{canvas.getStyle('backgroundColor')}"
+			 	selectedAlpha="{canvas.getStyle('backgroundAlpha')}"
+			 	gradientEnabled="false"
+			 	change="if(!canvas){return;}
+			 			canvas.setStyle('backgroundColor', backgoundColor.selectedColor);
+			 			canvas.setStyle('backgroundAlpha', backgoundColor.selectedAlpha);
+			 			UpdateIconImage();"
+			 	close="if(!canvas){return;}
+			 		   //canvas.UpdateIconBitmap();"/>
+		</mx:FormItem>
+
+		<!-- TRANSPARENT -->
+		<mx:FormItem label="Transparent:">
+			<mx:CheckBox id="transparencyCheck" selected="false"
+				toolTip="Set the Canvas backgroud as transparent"
+				change="onChangeTransCheck()" />
+		</mx:FormItem>
+		
+	</mx:Form>
+
+
+	<!-- MISC -->
+	<mx:Form width="100%"
+		indicatorGap="5"
+		styleName="CanvasForm">
+
+		<!--mx:FormItem>
+			<mx:Button id="displayRulesBtn" toggle="true"
+				toolTip="Displat Horizontal and Vertical Rules"
+				icon="{Globals.g_assets.AlignCenterIcon}"
+				click="onClickDisplayRules(event)"/>
+		</mx:FormItem-->
+
+
+		<mx:FormItem label="Snap Clouds">
+			<mx:CheckBox id="cloudSnapCheck" selected="true"
+				toolTip="Snap clouds to the canvas border"
+				change="onChangeTransCheck()" />
+		</mx:FormItem>
+
+	</mx:Form>
+
+
+
+
+</mx:VBox>

@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:HBox xmlns:mx="http://www.adobe.com/2006/mxml" >
+
+
+	<mx:Script>
+    <![CDATA[
+    	import controls.colorClasses.CloudGradient;
+
+
+		[Bindable]
+		private var gradient:CloudGradient = null;
+
+		[Bindable]
+		private var iconBitmap:Bitmap = null;
+
+		[Bindable]
+		private var gradientXML:XML = null;
+
+
+		// Init
+		public function init(gradient:CloudGradient):void
+		{
+			this.gradient = gradient;
+
+			//iconBitmap = new Bitmap(gradient.bitmap.bitmapData, 'auto', false); // Gradient Icon
+
+			gradientXML = this.gradient.Save();
+		}
+
+
+		
+
+
+	]]>
+    </mx:Script>
+
+
+	<mx:Image id="gradientIcon" source="{iconBitmap}"
+		maintainAspectRatio="true"
+		horizontalAlign="center" verticalAlign="middle"/>
+
+	
+
+</mx:HBox>

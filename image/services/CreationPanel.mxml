@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml" 
+	width="100%" height="100%"
+	currentState="import"
+
+	styleName="ImageService"
+
+	creationComplete="onCreationComplete()">
+
+
+	<mx:Script>
+    <![CDATA[
+
+		import mx.rpc.remoting.RemoteObject;
+        import mx.rpc.events.*;
+		import mx.controls.Image;
+		import mx.controls.Alert;
+		import mx.controls.ProgressBar;
+		import mx.managers.CursorManager;
+
+		import session.CloudSession;
+
+
+		// RoR RO
+        private var creationRemObj:RemoteObject = new RemoteObject();
+
+		[Bindable]
+		public var progressBar:ProgressBar = null;
+
+		[Bindable]
+		private var cloudSession:CloudSession = null; // active session
+
+		[Bindable]
+		private var userXML:XML = null;
+
+
+		// for creation icon and image name
+		private var dataID:String = '';
+
+		[Bindable]
+		public var creationData:ByteArray = null;
+
+
+
+		private function onCreationComplete():void
+		{
+			creationRemObj.destination = "CreationService";
+        	creationRemObj.addEventListener("fault", onFault);
+
+			creationRemObj.loadCreation.addEventListener("result", onResultLoadCreation);
+        	creationRemObj.saveCreation.addEventListener("result", onResultSaveCreation);
+        	creationRemObj.saveCreationData.addEventListener("result", onResultSaveCreationData);
+        	creationRemObj.saveCreationIcon.addEventListener("result", onResultSaveCreationIcon);
+
+			cloudSession = CloudEngine.GetInstance().GetSessionController().GetSession();
+			userXML = cloudSession.userXML;
+		}
+
+
+		private function onClickCreationBtn():void
+		{
+			if(!cloudSession.ValidateUser()) // Validate Registered User
+				return;
+
+			if(this.currentState == 'import')// import Creation
+			{
+				importCreation();
+			}
+			else // export Creation
+			{
+				exportCreation();
+			}
+		}
+
+
+		// IMPORT Creation
+		private function importCreation():void
+		{
+			var userID:String = cloudSession.userXML.@id;
+			var creationID:String = '1';
+
+			creationRemObj.loadCreation(userID, creationID);
+
+			CursorManager.setBusyCursor(); // Set the busy cursor
+			this.enabled = false;
+		}
+
+		private function onResultLoadCreation(event:ResultEvent):void 
+    	{
+    		this.enabled = true;
+            CursorManager.removeBusyCursor(); // Hide the busy cursor
+    	}
+
+
+
+
+		// EXPORT Creation
+		private function exportCreation():void
+		{
+			var userID:String = cloudSession.userXML.@id;
+			var creationID:String = '?';
+
+			var creationXML:XML = new XML("<creation></creation>"); // Creation XML
+			creationXML.@name = creationNameInput.text; // creation name input
+			creationXML.@type = 'ImageCreation';
+			creationXML.@attribute = (privateOption.selected ? 'Private' : 'Public');
+			creationXML.@description = creationDescription.text;
+
+			creationRemObj.saveCreation(userID, creationXML.toXMLString());
+
+			CursorManager.setBusyCursor(); // Set the busy cursor
+			this.enabled = false;
+		}
+
+
+		private function onResultSaveCreation(event:ResultEvent):void 
+    	{
+    		dataID = event.result as String;
+
+    		// Save Creation Data (image file)
+    		creationRemObj.saveCreationData(dataID, creationData);
+    	}
+
+		// Result Save Creation Data (image file)
+		private function onResultSaveCreationData(event:ResultEvent):void
+		{
+			// Save Creation Icon (image file)
+    		creationRemObj.saveCreationIcon(dataID, creationData);
+		}
+
+		// Result Save Creation Icon (image file)
+		private function onResultSaveCreationIcon(event:ResultEvent):void
+		{
+			// Done saving creation
+
+			this.enabled = true;
+            CursorManager.removeBusyCursor(); // Hide the busy cursor
+		}
+		
+
+		private function onFault(event:FaultEvent):void 
+        {
+        	this.enabled = true;
+            CursorManager.removeBusyCursor(); // Hide the busy cursor
+
+            CloudAlert.show(event.fault.faultString, 'Creation Error');			
+        }
+
+	]]>
+    </mx:Script>
+
+
+	<mx:HBox horizontalGap="0" verticalAlign="middle">
+		<mx:Label id="exportInstructions"
+			text="Export the Image Creation to my" paddingRight="0" />
+
+		<mx:LinkButton label="TriCloud Portfolio" 
+			click="navigateToURL(new URLRequest('/portfolio/index/' + userXML.@id + '?view=private'), 'TriCloud')" />
+	</mx:HBox>
+
+
+	<mx:Form id="creationExportForm" width="100%"
+		verticalGap="10" horizontalGap="5"
+		indicatorGap="10"
+		paddingLeft="5" paddingTop="5" paddingRight="5" paddingBottom="5"
+		borderStyle="solid" borderColor="0xC0C0C0">
+
+		<mx:FormItem label="Image Name:" styleName="CloudFormItem">
+			<mx:TextInput id="creationNameInput" text="" fontWeight="bold" maxChars="64"/>
+		</mx:FormItem>
+
+		<mx:FormItem label="Description:" styleName="CloudFormItem">
+			<mx:TextArea id="creationDescription" width="250" height="50"/>
+		</mx:FormItem>
+
+		<mx:FormItem label="Visibility:" styleName="CloudFormItem" verticalGap="0">
+			<mx:RadioButton id="publicOption" label="Public (Anyone will be able so see this Image)" selected="true" />
+			<mx:RadioButton id="privateOption" label="Private (Only you will be able to see this Image)" />
+		</mx:FormItem>
+
+	</mx:Form>
+
+
+	<mx:HBox width="100%"
+		horizontalAlign="left" verticalAlign="middle">
+
+		<mx:Button id="creationBtn" click="onClickCreationBtn()" />
+
+	</mx:HBox>
+
+
+	<mx:StringValidator id="creationNameValidator" source="{creationNameInput}" property="text" 
+		required="true"
+       	requiredFieldError="Creation Name is required."
+       	trigger="{creationBtn}" triggerEvent="click"/>
+
+
+	<mx:states>
+		<mx:State name="import">
+			<mx:SetProperty target="{creationBtn}" name="label" value="Import Image" />
+		</mx:State>
+
+		<mx:State name="export">
+			<mx:SetProperty target="{creationBtn}" name="label" value="Export Image" />
+		</mx:State>
+	</mx:states>
+
+
+</mx:VBox>

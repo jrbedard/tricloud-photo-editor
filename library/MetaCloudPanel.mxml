@@ -1,0 +1,305 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Panel xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:panels="panels.*" xmlns:cloudControls="controls.*"
+	horizontalScrollPolicy="off" verticalScrollPolicy="off"
+	currentState="view"
+
+	backgroundColor="0xf5f5f5"
+	paddingLeft="0" paddingRight="0"
+	headerHeight="0" borderStyle="none"
+	borderThicknessLeft="0" borderThicknessRight="0" borderThicknessTop="0"
+
+	creationComplete="onCreationComplete()">
+
+
+	<mx:Script>
+    <![CDATA[
+    	import events.CloudEvent;
+    	import mx.core.Application;
+    	import mx.events.ItemClickEvent;
+    	import mx.binding.utils.*;
+    	import mx.managers.PopUpManager;
+
+    	import core.Cloud;
+		import panels.right.CloudPanelHeader;
+		import CloudEngine;
+
+
+
+		private var cloudPanelHeader:CloudPanelHeader = null;
+
+
+		[Bindable]
+		private var metaCloud:XML = null;
+
+
+
+		private function onCreationComplete():void
+		{
+			metaCloudAcc.getHeaderAt(0).setStyle("paddingBottom", 12); // Offset Cloud Name to leave some space for Cloud Type
+
+			this.addEventListener("metaCloudChange", onChangeSelectedMetaCloud);
+		}
+
+
+		public function init(cloudPanelHeader:CloudPanelHeader):void
+		{
+			this.cloudPanelHeader = cloudPanelHeader;
+		}
+
+
+
+		// Changed the selected meta cloud in the cloud Library
+		private function onChangeSelectedMetaCloud(metaCloudEvent:MetaCloudEvent):void
+		{
+			metaCloud = metaCloudEvent.metaCloud;
+			if(!metaCloud)
+				return;
+
+			cloudPanelHeader.SetMetaCloud(metaCloud, metaCloudEvent.iconBitmap); // Set MetaCloud to the header
+
+			// Set Icon on Information: accordion
+			cloudInfo.icon = CloudType.Icon(metaCloud.@type);
+
+			// list tags for this cloud
+			//tagControl.ListTags();
+		}
+
+
+
+		private function onItemClickCloudBtnBar(event:ItemClickEvent):void
+		{
+			if(!event.item)
+				return
+
+			var itemName:String = event.item.name;
+
+			// Dispatch event like download, favorite, flag cloud
+			this.dispatchEvent(new MetaCloudEvent(itemName, metaCloud));
+		}
+
+
+		private function onClickCloudAuthor(event:Event):void
+		{
+			navigateToURL(new URLRequest('/portfolio/index/' + metaCloud.@userID + '?view=public'), 'TriCloud');
+		}
+
+		private function onTagLinkClick(event:TextEvent):void
+		{
+			// handled direclty in CloudLibrary
+		}
+
+	]]>
+    </mx:Script>
+
+	
+	<mx:Style>
+
+		.CloudInfoForm
+		{
+			indicatorGap: 5;
+			horizontalAlign: center; verticalAlign: middle;
+			horizontalGap:0; verticalGap:0;
+			paddingTop: 5; paddingLeft: 5; paddingRight: 5; paddingBottom: 5;
+		   	borderStyle: none;
+		  	dropShadowEnabled: false;
+	  	}
+
+	</mx:Style>
+
+
+
+	<!-- Accordion to be similar the CloudPanel -->
+	<mx:Accordion id="metaCloudAcc" width="100%" height="100%"
+		enabled="{metaCloud != null}"
+		creationPolicy="all" historyManagementEnabled="false"
+		borderStyle="solid" verticalGap="0">
+
+		<mx:VBox width="100%" height="100%" horizontalAlign="center" 
+			label="{metaCloud.@name}"
+			icon="{Globals.g_assets.Blank48Icon}">
+
+			<mx:Form width="100%" verticalGap="3"
+				paddingTop="5" paddingLeft="5" paddingRight="5" paddingBottom="5"
+				borderSides="bottom" borderStyle="solid">
+
+				<!--mx:FormItem label="Type:">
+					<mx:Label id="cloudType" text="{metaCloud.type} {metaCloud.subType}" fontStyle="italic"/>
+				</mx:FormItem-->
+
+				<mx:FormItem label="By:" indicatorGap="9">
+					<mx:LinkButton id="cloudAuthor" label="{metaCloud.@userName}" 
+						click="onClickCloudAuthor(event)" />	
+				</mx:FormItem>
+
+				<mx:FormItem label="Submitted:">
+					<mx:Label id="cloudSubmitted" text="{metaCloud.@created}" 
+						 maxWidth="100"/>
+				</mx:FormItem>
+
+				<mx:FormItem label="Used:">
+					<mx:Label id="cloudUsage" text="{metaCloud.@useCount} time{metaCloud.@useCount>0?'s':''}" />
+				</mx:FormItem>
+
+				<!--mx:FormItem label="Attribute:">
+					<mx:Label id="cloudAttribute" text="{metaCloud.attribute}" />
+				</mx:FormItem>
+
+				<mx:FormItem label="Price:">
+					<mx:Label id="cloudPrice" text="{metaCloud.price} cc." />
+				</mx:FormItem-->
+
+				<mx:FormItem label="Ratings:">
+					<cloudControls:RatingControl id="cloudRating" 
+						 rating = "{metaCloud.@averageRating}"
+						 ratingCount = "{metaCloud.@ratingCount}"
+						 editable="{this.currentState == 'edit'}"
+						 displayNotStar="true" />	
+				</mx:FormItem>
+
+			</mx:Form>
+
+
+			<mx:ButtonBar id="cloudButtonBar" horizontalAlign="center"
+				itemClick="onItemClickCloudBtnBar(event)">
+				<mx:Object name="downloadCloud" icon="{Globals.g_assets.NewImageCloudIcon}" toolTip="Download this Cloud" />
+				<mx:Object name="favoriteCloud" icon="{Globals.g_assets.StarIcon}" toolTip="Add this Cloud to My Favorites" />
+				<mx:Object name="flagCloud" 	icon="{Globals.g_assets.FlagIcon}" toolTip="Flag Cloud as Inappropriate Content" />
+				<!--mx:Object name="deleteCloud" icon="{Globals.g_assets.DeleteCloudIcon}" toolTip="Delete this Cloud" /-->
+			</mx:ButtonBar>
+
+
+
+			<mx:Accordion id="subMetaCloudAcc" width="100%" height="100%"
+				creationPolicy="all" historyManagementEnabled="false" verticalGap="0" > 
+
+				<!-- CLOUD DESCRIPTION + TAGS -->
+				<mx:VBox id="cloudInfo" label="Informations:" 
+					width="100%" height="100%" 
+					icon="{Globals.g_assets.ImageIcon}"
+					verticalGap="0"
+					paddingLeft="0" paddingTop="0" paddingRight="0">
+
+
+					<!-- CLOUD TYPE VIEWSTACK -->
+					<mx:ViewStack id="cloudTypeViewStack" width="100%"
+						borderStyle="solid" borderSides="bottom"
+						creationPolicy="auto" resizeToContent="true"
+						selectedIndex="{CloudType.GetIndex(metaCloud.@type)}">
+
+						<!-- IMAGE -->
+						<mx:Form id="imageInfo" label="Image" name="image"
+							styleName="CloudInfoForm">
+							<mx:FormItem label="Width:">
+								<mx:Label text="{metaCloud.@width} pixels" />
+							</mx:FormItem>
+
+							<mx:FormItem label="Height:">
+								<mx:Label text="{metaCloud.@height} pixels" />
+							</mx:FormItem>
+
+							<mx:FormItem label="Size:">
+								<mx:Label text="{Globals.GetFileSize(metaCloud.@size)}" />
+							</mx:FormItem>
+
+							<!-- MORE -->
+							<!--mx:FormItem label="Transparent:">
+								<mx:Label text="true" />
+							</mx:FormItem-->
+						</mx:Form>
+
+						<!-- FONT -->
+						<mx:Form id="fontInfo" label="Font" name="font"
+							styleName="CloudInfoForm">
+
+							<mx:FormItem label="Bold:">
+								<mx:Label text="{metaCloud.@hasBold}" />
+							</mx:FormItem>
+
+							<mx:FormItem label="Italic:">
+								<mx:Label text="{metaCloud.@hasItalic}" />
+							</mx:FormItem>
+							
+						</mx:Form>
+						
+						<!-- BRUSH -->
+						<mx:Form id="brushInfo" label="Brush" name="brush"
+							styleName="CloudInfoForm">
+							<mx:FormItem label="Brush Stroke:">
+							 	<mx:Box borderStyle="solid" borderColor="0xCCCCCC">
+							 		<mx:Image id="brushSample" width="128" height="32"/>
+							 	</mx:Box>
+							</mx:FormItem>
+						</mx:Form>
+
+						<!-- SHAPE -->
+						<mx:Form id="shapeInfo" label="Shape" name="shape"
+							styleName="CloudInfoForm">
+							
+						</mx:Form>
+		
+						<!-- EFFECT -->
+						<mx:Form id="effectInfo" label="Effect" name="effect"
+							styleName="CloudInfoForm">
+							
+						</mx:Form>
+
+					</mx:ViewStack> 
+
+
+					<mx:Label text="Description:" fontWeight="bold"/>
+					<mx:TextArea id="descriptionText" borderSides="top, bottom"
+						width="100%" height="100%"
+						text="{metaCloud.@description}"
+						editable="false"/>
+
+					<!--cloudControls:DescriptionControl id="cloudDescription"
+						width="100%" height="50%"
+						text="{metaCloud.@description}"
+						cloudID="{metaCloud.@id}"
+						editable="false"/-->
+
+					<mx:Label text="tags:"/>
+					<cloudControls:TagControl id="tagControl" 
+						width="100%" height="100%"
+						metaCloud="{metaCloud}"
+						tags="{metaCloud.@tags}"
+						tagClick="{onTagLinkClick(event)}"/>
+
+
+					<mx:Box width="100%" borderStyle="solid" borderSides="bottom" verticalGap="0">
+						<mx:HBox horizontalGap="0">
+							<mx:Image source="{Globals.g_assets.CommentIcon}" /> 
+							<mx:LinkButton label="{String(metaCloud.@commentCount) + (metaCloud.@commentCount > 1 ? ' Comments' : ' Comment')}"
+								click="navigateToURL(new URLRequest('/cloud/index/' + metaCloud.@id), 'TriCloud');" />
+						</mx:HBox>
+
+						<!--mx:LinkButton label="Comment this Cloud!"
+							click="navigateToURL(new URLRequest('/cloud/index/' + metaCloud.@id), 'TriCloud');" /-->		
+					</mx:Box>
+
+				</mx:VBox>
+
+
+			</mx:Accordion>
+
+		</mx:VBox>
+
+	</mx:Accordion>
+
+
+
+	<mx:states>
+		<!-- VIEWING THE CLOUD -->
+		<mx:State name="view">
+			
+		</mx:State>
+
+		<!-- EDIT metacloud, DOWNLOADED -->
+		<mx:State name="edit">
+			
+		</mx:State>
+	</mx:states>
+
+
+</mx:Panel>
+

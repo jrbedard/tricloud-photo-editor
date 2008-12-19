@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:cloudPanels="panels.*"
+	width="400" height="300"
+	titleIcon="{Globals.g_assets.HelpIcon}"
+	title="Help"
+	layout="vertical"
+	horizontalScrollPolicy="off" verticalScrollPolicy="off"
+	showCloseButton="true"
+
+	styleName="CloudDialog"
+	titleStyleName="CloudDialogTitle"
+
+	creationComplete="onCreationComplete()"
+	close="onClickOk()">
+
+
+	<mx:Script>
+    <![CDATA[
+
+		import mx.managers.PopUpManager;
+
+
+		// Static instance, singleton
+		public static const helpDialog:HelpDialog = new HelpDialog();
+
+
+		private function onCreationComplete():void
+    	{
+    		// Set the Right Click menu for this Dialog
+   			var rightClickMenu:RightClickMenu = new RightClickMenu(this.title);
+   			this.contextMenu = rightClickMenu.triCloudContextMenu;
+    	}
+
+		private function onClickOnlineHelp():void
+		{
+			var request:URLRequest = new URLRequest("/help");
+			navigateToURL(request, "TriCloud");
+		}
+
+		private function onClickOk():void
+		{
+			PopUpManager.removePopUp(helpDialog);
+		}
+
+		private function onClickCancel():void
+		{
+			PopUpManager.removePopUp(helpDialog);
+		}
+
+ 	]]>
+    </mx:Script>
+
+	<mx:LinkButton id="onlineHelp" label="Online Help" click="onClickOnlineHelp()" />
+
+    <mx:ControlBar>
+		<mx:Button id="okButton" label="Ok" click="onClickOk()" styleName="OkButton" />
+		<mx:Button id="cancelButton" label="Cancel" click="onClickCancel()" styleName="CancelButton" />
+	</mx:ControlBar>
+    
+</mx:TitleWindow>

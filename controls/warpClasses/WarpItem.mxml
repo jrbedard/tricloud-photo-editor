@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Image xmlns:mx="http://www.adobe.com/2006/mxml"
+	width="32" height="32"
+	toolTip="{warp.name}"
+	source="{iconBitmap}"
+	maintainAspectRatio="true"
+
+	creationComplete="onCreationComplete()"
+ 	dataChange="onDataChange(event)">
+
+
+	<mx:Script>
+	<![CDATA[
+
+		[Bindable]
+		private var warp:CloudWarp = null;
+
+		[Bindable]
+		private var iconBitmap:Bitmap = null;
+
+
+		private function onCreationComplete():void
+		{
+			
+		}
+
+		private function onDataChange(event:Event):void
+		{
+			this.warp = this.data as CloudWarp;
+
+			if(warp && warp.iconBitmap)
+			{
+				iconBitmap = new Bitmap(warp.iconBitmap.bitmapData, "auto", true);
+			}
+		}
+
+	]]>
+    </mx:Script>
+
+</mx:Image>

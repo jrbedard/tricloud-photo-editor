@@ -1,0 +1,318 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:cloudPanels="panels.*" xmlns:image="image.*"
+	xmlns:imageService="image.services.*"
+	width="600" height="600"
+	maxWidth="600" maxHeight="600"
+	titleIcon="{Globals.g_assets.ImageImporter}"
+	title="Image Importer"
+	layout="vertical"
+	horizontalScrollPolicy="off" verticalScrollPolicy="off"
+	showCloseButton="true"
+
+	styleName="CloudDialog"
+	titleStyleName="CloudDialogTitle"
+	horizontalAlign="center"
+	verticalGap="0"
+
+	creationComplete="onCreationComplete()"
+	close="onClickCancel()">
+
+
+
+	<mx:Script>
+    <![CDATA[
+
+    	import flash.display.Bitmap;
+    	import mx.controls.Alert;
+    	import mx.controls.Image;
+    	import mx.collections.ArrayCollection;
+        import mx.collections.IViewCursor;
+        import mx.events.ListEvent;
+        import mx.managers.PopUpManager;
+
+		import RightClickMenu;
+
+
+		// Static instance, singleton
+		public static const imageImportDialog:ImportDialog = new ImportDialog();
+
+
+
+		[Bindable]
+		public var imageList:ArrayCollection = new ArrayCollection(); // List of Image
+
+
+
+    	private function onCreationComplete():void
+    	{
+    		// Set the Right Click menu for this Dialog
+   			var rightClickMenu:RightClickMenu = new RightClickMenu(this.title);
+   			this.contextMenu = rightClickMenu.triCloudContextMenu;
+    	}
+
+    	public function Init():void
+    	{
+    		this.width = Math.min(maxWidth, this.parentApplication.width);
+    		this.height = Math.min(maxHeight, this.parentApplication.height);
+    	}
+
+
+		private function onDownloadStarted(event:Event):void
+		{
+			progressBar.visible = true;
+		}
+
+		private function onDownloadProgress(event:ProgressEvent):void
+		{
+			progressBar.setProgress(event.bytesLoaded, event.bytesTotal);
+			progressBar.label = "Downloading '" + Globals.GetFileName(imageLoader.source.toString())+ "' " + 
+				Globals.GetFileSize(event.bytesLoaded) + "/" + Globals.GetFileSize(event.bytesTotal) + ".";
+		}
+
+
+		private function onDownloadCompleted(event:Event):void
+		{
+			progressBar.visible = false;
+
+			PopUpManager.centerPopUp(this);
+
+			// Create Meta Image
+			var metaImage:MetaImage = new MetaImage();
+			metaImage.imageName = Globals.GetFileName(imageLoader.source.toString());
+			metaImage.imageWidth = imageLoader.contentWidth;
+			metaImage.imageHeight = imageLoader.contentHeight;
+			metaImage.imageSize = Globals.GetFileSize(imageLoader.bytesTotal);
+			metaImage.bitmap = new Bitmap(Bitmap(imageLoader.content).bitmapData);
+
+			imageList.addItem(metaImage); // Add new metaImage to the list
+
+			imageGrid.selectedIndex = imageList.length-1; // Select last imported image
+
+			importedImagesBox.enabled = true;
+		}
+
+
+
+
+		private function GetCloudName(imageName:String):String
+		{
+			var lastDot:uint = imageName.lastIndexOf('.');
+			var cloudName:String = imageName.substring(0, lastDot); // Extract filename without extension
+
+			return cloudName;
+		}
+		
+
+
+
+		// Download ERRORS
+		private function onHttpError(httpStatusEvent:HTTPStatusEvent):void
+		{
+			//CloudAlert.show(httpStatusEvent.type, "Http Error"); // TODO :WHY??
+		}
+		private function onIOError(ioErrorEvent:IOErrorEvent):void
+		{
+			CloudAlert.show(ioErrorEvent.text, "IO Error");
+		}
+		private function onSecurityError(securityErrorEvent:SecurityErrorEvent):void
+		{
+			CloudAlert.show(securityErrorEvent.text, "Security Error");	
+		}
+
+
+
+		private function onItemClickImageList(event:ListEvent):void
+		{
+			
+		}
+
+
+
+		// Control Bar Events
+		// ----------------------------------
+		private function onClickImport():void
+		{
+			var bmp:Bitmap = imageList.getItemAt(imageGrid.selectedIndex).bitmap as Bitmap
+			if(!bmp)
+			{
+				CloudAlert.show('Invalid Image', 'Image Importer');
+				return;
+			}
+
+			this.dispatchEvent(new ImageEvent("importImage", 
+				bmp,
+				cloudNameInput.text,
+				resizeCanvas.selected));
+		}
+
+		private function onClickCancel():void
+		{
+			PopUpManager.removePopUp(imageImportDialog);
+		}
+
+
+   	]]>
+    </mx:Script>
+
+
+	<mx:TabBar direction="horizontal" height="30"
+		iconField="@icon" labelField="@label"
+		dataProvider="{imageViewStack}"
+		selectedIndex="0"
+
+	 	buttonStyleName="ImageServiceButton"
+		verticalAlign="middle"
+		borderStyle="solid"
+		paddingLeft="15"/>
+
+	<mx:ViewStack id="imageViewStack" width="100%" height="100"
+		creationPolicy="all"
+		paddingLeft="10" paddingTop="0" paddingRight="10" paddingBottom="10"
+		borderStyle="solid" cornerRadius="15">
+
+		<imageService:LocalImportPanel id="localImage"
+			label="Local" icon="{Globals.g_assets.LocalImageIcon}"
+			progressBar="{progressBar}" imageLoader="{imageLoader}"
+			toolTip="Load an Image from my local hard drive"/>
+
+		<imageService:WebPanel id="webImage"
+			label="Web" icon="{Globals.g_assets.WebImageIcon}"
+			progressBar="{progressBar}" imageLoader="{imageLoader}"
+			toolTip="Import an Image from a URL address"/>
+
+		<imageService:CreationPanel id="creationImage"
+		   	label="TriCloud" icon="{Globals.g_assets.LocalImageIcon}"
+			currentState="import"
+			progressBar="{progressBar}"
+			toolTip="Import an Image from my TriCloud Creation account."/>
+
+		<!--imageService:FlickrPanel id="flickrImage" 
+			label="Flickr" icon="{Globals.g_assets.FlickrImageIcon}"
+			toolTip="Import Images from Flickr"
+			enabled="true"/>
+
+		<mx:Box id="photoBucketImage" 
+			label="PhotoBucket" icon="{Globals.g_assets.FlickrImageIcon}"
+			toolTip="Import Images from Photobucket"
+			enabled="true"/-->
+
+	</mx:ViewStack>
+
+	
+
+	<!-- IMAGE AND PROGRESS BAR -->
+	<mx:Canvas width="100%">
+		<mx:Image id="downArrow" source="{Globals.g_assets.DownArrow}"
+			x="{this.width/2 - downArrow.width/2 - 10}" y="0"
+			alpha="{progressBar.visible ? 0.25: 0.75}" />
+
+		<mx:ProgressBar id="progressBar" width="100%" 
+			x="0" y="0"
+			mode="manual"
+			label="" labelPlacement="top" 
+			enabled="true"
+			visible="false"/>
+	</mx:Canvas>
+
+
+
+	<mx:VBox id="importedImagesBox" width="100%" enabled="false"
+		borderStyle="solid" borderColor="0xC0C0C0" cornerRadius="15"
+		verticalGap="10" paddingTop="10"
+		horizontalAlign="center">
+
+		<mx:Label text="Imported Images:" />
+
+		<mx:TileList id="imageGrid" width="100%"
+			columnCount="1" columnWidth="100"
+			rowCount="1" rowHeight="100"
+			doubleClickEnabled="true"
+			allowDragSelection="false"
+			useRollOver="false"
+
+			dataProvider="{imageList}"
+			itemRenderer="image.ImageListItem"
+
+			itemClick="onItemClickImageList(event);"/>
+
+
+		<mx:SWFLoader id="imageLoader" autoLoad="true"
+			width="100%" height="100%"
+			maxWidth="100" maxHeight="100"
+			maintainAspectRatio="true"
+			horizontalAlign="center" verticalAlign="middle"
+			visible="false" includeInLayout="false"
+
+			open="onDownloadStarted(event)"
+			progress="onDownloadProgress(event)"
+			complete="onDownloadCompleted(event)"
+			httpStatus="onHttpError(event)"
+			ioError="onIOError(event)"
+			securityError="onSecurityError(event)"/>
+
+
+		<mx:Canvas id="selImageBox" width="100%" enabled="true"
+			horizontalScrollPolicy="off" verticalScrollPolicy="off">
+
+
+			<mx:Form id="imageFileInfo" x="0" y="0"
+				width="300"
+				horizontalScrollPolicy="off" verticalScrollPolicy="off"
+				verticalGap="3"
+				paddingLeft="5" paddingTop="5" paddingBottom="5" paddingRight="5">
+
+				<mx:FormItem label="Image Name:">
+					<mx:Label text="{imageList.getItemAt(imageGrid.selectedIndex).imageName}" />
+				</mx:FormItem>
+
+				<mx:FormItem label="Width:">
+					<mx:Label text="{imageList.getItemAt(imageGrid.selectedIndex).imageWidth} pixels" />
+				</mx:FormItem>
+
+				<mx:FormItem label="Height:">
+					<mx:Label text="{imageList.getItemAt(imageGrid.selectedIndex).imageHeight} pixels" />
+				</mx:FormItem>
+
+				<mx:FormItem label="Size:">
+					<mx:Label text="{imageList.getItemAt(imageGrid.selectedIndex).imageSize}" />
+				</mx:FormItem>
+
+			</mx:Form>
+
+
+			<mx:Image id="rightArrow" source="{Globals.g_assets.RightArrow}"
+				x="225" y="25"
+				alpha="0.75" />
+
+
+
+			<mx:Form id="imageCloudInfo" x="300" y="0"
+				width="300"
+				horizontalScrollPolicy="off" verticalScrollPolicy="off"
+				verticalGap="3"
+				paddingLeft="5" paddingTop="5" paddingBottom="5" paddingRight="5">
+
+				<mx:FormItem label="Cloud name:">
+					<mx:TextInput id="cloudNameInput" 
+						text="{GetCloudName(imageList.getItemAt(imageGrid.selectedIndex).imageName)}"
+						fontWeight="bold" maxChars="64" width="125" />
+				</mx:FormItem>
+
+				<mx:FormItem label="Resize Canvas:">
+					<mx:CheckBox id="resizeCanvas" selected="true" />
+				</mx:FormItem>
+
+			</mx:Form>
+
+		</mx:Canvas>
+
+	</mx:VBox>
+
+
+	<mx:ControlBar>
+		<mx:Button id="importButton" label="Import" click="onClickImport()" 
+			enabled="{imageGrid.selectedIndex != -1}" styleName="OkButton" />
+		<mx:Button id="cancelButton" label="Cancel" click="onClickCancel()" styleName="CancelButton" />		
+	</mx:ControlBar>
+
+</mx:TitleWindow>

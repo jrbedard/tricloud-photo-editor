@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml" 
+	width="{iconWidth}" height="{iconHeight}"
+ 	horizontalScrollPolicy="off" verticalScrollPolicy="off"
+ 	buttonMode="true" useHandCursor="true"
+
+	borderStyle="solid" borderColor="0xCCCCCC"
+
+	rollOver="onRollOver(event);"
+	rollOut="onRollOut(event);">
+
+
+	<mx:Script>
+    <![CDATA[
+
+		import mx.core.UIComponent;
+		import mx.managers.PopUpManager;
+
+
+		private var _sourcePanel:UIComponent = null;
+		
+
+		[Bindable]
+		public function set sourcePanel(value:UIComponent):void
+		{
+			_sourcePanel = value;
+			UpdateIcon();
+		}
+		public function get sourcePanel():UIComponent
+		{
+			return _sourcePanel;
+		}
+
+
+		[Bindable]
+		public var iconWidth:uint = 100;
+
+		[Bindable]
+		public var iconHeight:uint = 100;
+
+
+		[Bindable]
+		public var iconBitmap:Bitmap = null; // Icon of the cloud to submit
+
+
+		// Image Preview Dialog
+		private var imagePreviewDialog:ImageDialog = ImageDialog.imagePreviewDialog;
+
+
+
+		public function init():void
+		{
+			UpdateIcon();
+		}
+
+
+		private function UpdateIcon():void
+		{
+			if(!sourcePanel || !iconWidth || !iconHeight)
+				return;
+
+			// Set source Image
+			var bmpData:BitmapData = new BitmapData(iconWidth, iconHeight, true, 0);
+
+			var sourceMat:Matrix = Globals.GetIconMatrix(sourcePanel, iconWidth, iconHeight);
+		    bmpData.draw(sourcePanel, sourceMat); // Draw to BitmapData
+
+			iconBitmap = new Bitmap(bmpData, 'auto', true); // Create Bitmap
+		}
+
+
+		private function onClickPreview(sourceImage:Boolean):void
+		{
+			PopUpManager.addPopUp(imagePreviewDialog, this.parentApplication as DisplayObject, false);
+			imagePreviewDialog.init(sourcePanel, sourcePanel.name, false);
+			PopUpManager.centerPopUp(imagePreviewDialog);
+
+			imagePreviewDialog.addEventListener("close", onCloseImagePreview); // detect closing
+		}
+
+		// Close image preview
+		private function onCloseImagePreview(event:Event):void
+        {
+        	imagePreviewDialog.removeEventListener("close", onCloseImagePreview); // remove event listener
+
+            PopUpManager.removePopUp(imagePreviewDialog);
+        }
+
+		private function onRollOver(event:MouseEvent):void
+		{
+			this.setStyle('borderColor', 0x444444);
+		}
+
+		private function onRollOut(event:MouseEvent):void
+		{
+			this.setStyle('borderColor', 0xCCCCCC);
+		}
+
+
+		// Called when a dialog containing this thumb is closed
+		public function Close():void
+		{
+			PopUpManager.removePopUp(imagePreviewDialog);
+
+			// Free Memory
+			iconBitmap = null;
+			imagePreviewDialog.previewBitmap = null;
+		}
+
+	]]>
+    </mx:Script>
+
+	<mx:Image id="imageThumb" source="{iconBitmap}"
+		width="{iconWidth}" height="{iconHeight}" 
+		maxWidth="{iconWidth}" maxHeight="{iconHeight}"
+		maintainAspectRatio="true"
+		horizontalAlign="center" verticalAlign="middle"
+		click="onClickPreview(true)"/>
+
+</mx:Canvas>

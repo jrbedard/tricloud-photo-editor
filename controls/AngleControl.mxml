@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml"
+	width="125" height="50"
+
+	creationComplete="onCreationComplete()">
+
+
+	<mx:Metadata>
+        [Event(name="change", type="flash.events.Event")]
+    </mx:Metadata>
+
+
+ 	<mx:Script>
+    <![CDATA[
+
+		import mx.events.NumericStepperEvent;
+
+
+		private var _selectedColor:uint = 0x000000;
+
+		private var _value:int = 0;
+
+		private var lineTip:Point = new Point(); // end of the line
+
+		private var angleCirclePos:Point = new Point(); // AngleCircle global space position
+
+
+
+		private function onCreationComplete():void
+		{
+			this.addEventListener("change", onChangeAngle);
+			UpdateAngleCircle();
+		}
+
+
+		[Inspectable(defaultValue=0x000000)]
+		public function set selectedColor(color:uint):void
+		{
+			_selectedColor = color;
+			UpdateAngleCircle();	
+		}
+
+		[Bindable]
+		public function get selectedColor():uint
+		{
+			return _selectedColor;
+		}
+
+
+
+		[Inspectable(defaultValue=0)]
+		public function set value(angle:int):void
+		{
+			_value = angle;
+			dispatchEvent(new Event("change"));
+		}
+
+		[Bindable]
+		public function get value():int
+		{
+			return _value;
+		}
+
+
+		private function onChangeAngle(event:Event):void
+		{
+			UpdateAngleCircle();
+		}
+
+	
+		private function UpdateAngleCircle():void
+		{
+			var halfSize:uint = Math.round(angleCircle.height*0.5);
+
+			// BackGround Circle
+			angleCircle.graphics.clear();
+			angleCircle.graphics.lineStyle(2, _selectedColor, 0.75);
+			angleCircle.graphics.beginFill(0xDDDDDD, 0.5);
+			angleCircle.graphics.drawCircle(halfSize, halfSize, halfSize);
+			angleCircle.graphics.endFill();
+
+			// Center small Circle
+			angleCircle.graphics.lineStyle(1, 0x888888, 0.75);
+			angleCircle.graphics.beginFill(0x222222, 0.5);
+			angleCircle.graphics.drawCircle(halfSize, halfSize, 4);
+			angleCircle.graphics.endFill();
+
+			// Line
+			angleCircle.graphics.lineStyle(1, 0x222222, 0.9);
+			angleCircle.graphics.moveTo(halfSize, halfSize);
+
+			var radVal:Number = Math.PI * _value / 180;
+			lineTip.x = halfSize + halfSize * Math.cos(radVal);
+			lineTip.y = halfSize + halfSize * Math.sin(radVal); 
+
+			angleCircle.graphics.lineTo(lineTip.x, lineTip.y);
+
+			// arrows
+			angleCircle.graphics.moveTo(lineTip.x, lineTip.y);
+			angleCircle.graphics.lineTo(lineTip.x - 8 * Math.cos(radVal) - 4 * Math.sin(radVal), 
+										lineTip.y - 8 * Math.sin(radVal) + 4 * Math.cos(radVal));
+
+			angleCircle.graphics.moveTo(lineTip.x, lineTip.y);
+			angleCircle.graphics.lineTo(lineTip.x - 8 * Math.cos(radVal) + 4 * Math.sin(radVal), 
+										lineTip.y - 8 * Math.sin(radVal) - 4 * Math.cos(radVal));
+		}
+
+
+		private function onClickCircle(event:MouseEvent):void
+		{
+			angleCirclePos.x = angleCircle.x;
+			angleCirclePos.y = angleCircle.y;
+			angleCirclePos = angleCircle.parent.localToGlobal(angleCirclePos); // Compute AngleCircle position in global space
+
+			PositionToAngle(event.stageX, event.stageY);
+		}
+
+
+		private function onMouseDownCircle(event:MouseEvent):void
+		{
+			angleCirclePos.x = angleCircle.x;
+			angleCirclePos.y = angleCircle.y;
+			angleCirclePos = angleCircle.parent.localToGlobal(angleCirclePos); // Compute AngleCircle position in global space
+
+			if(this.parentDocument.isPopUp ||  // angleControl on a Dialog
+			  (this.parentDocument.parentDocument && this.parentDocument.parentDocument.isPopUp))
+			{
+				this.parentDocument.addEventListener(MouseEvent.MOUSE_MOVE, onMouseMoveApp);
+				this.parentDocument.addEventListener(MouseEvent.MOUSE_UP, onMouseUpApp); // BUG if mouse up outside application
+			}
+			else // angleControl on the application
+			{
+				this.parentApplication.addEventListener(MouseEvent.MOUSE_MOVE, onMouseMoveApp);
+				this.parentApplication.addEventListener(MouseEvent.MOUSE_UP, onMouseUpApp); // BUG if mouse up outside application
+			}
+		}
+
+
+		private function onMouseMoveApp(event:MouseEvent):void
+		{
+			PositionToAngle(event.stageX, event.stageY);
+		}
+
+		private function onMouseUpApp(event:MouseEvent):void
+		{
+			if(this.parentDocument.isPopUp ||  // angleControl on a Dialog
+			  (this.parentDocument.parentDocument && this.parentDocument.parentDocument.isPopUp))
+			{
+				this.parentDocument.removeEventListener(MouseEvent.MOUSE_MOVE, onMouseMoveApp);
+				this.parentDocument.removeEventListener(MouseEvent.MOUSE_UP, onMouseUpApp);
+			}
+			else // angleControl on the application
+			{
+				this.parentApplication.removeEventListener(MouseEvent.MOUSE_MOVE, onMouseMoveApp);
+				this.parentApplication.removeEventListener(MouseEvent.MOUSE_UP, onMouseUpApp);
+			}
+			
+		}
+
+
+
+		private function PositionToAngle(posX:uint, posY:uint):void
+		{
+			var dx:Number = Number(posX - (angleCirclePos.x + angleCircle.width*0.5));
+			var dy:Number = Number(posY - (angleCirclePos.y + angleCircle.height*0.5));
+
+			this.value = Math.atan2(dy, dx) * 180.0/Math.PI;
+
+			UpdateAngleCircle();
+		}
+
+
+		// Changed Numeric Stepper Angler value
+		private function onChangeNumericValue(event:NumericStepperEvent):void
+		{
+			if(event.value > 180)
+			{
+				this.value = -179;
+			}
+			else if(event.value < -180)
+			{
+				this.value = 179;
+			}
+			else
+			{
+				this.value = event.value;
+			}
+		}
+
+	]]>
+    </mx:Script>
+
+	<mx:Image id="angleCircle" width="50" height="50" x="0" y="0"
+	 	mouseDown="onMouseDownCircle(event)"
+	 	click="onClickCircle(event)"/>
+
+	<mx:NumericStepper id="angleNumeric" width="60" 
+		x="60" y="{(this.height-angleNumeric.height)*0.5}"
+		minimum="-181" maximum="181" maxChars="4"
+		value="{this.value}"
+		change="onChangeNumericValue(event)"/>
+
+</mx:Canvas>

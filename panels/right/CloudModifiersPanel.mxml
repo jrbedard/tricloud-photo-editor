@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:rightPanels="panels.right.*" 
+	xmlns:cloudControls="controls.*"
+	verticalScrollPolicy="auto"
+
+	paddingTop="5" paddingLeft="0" paddingRight="0" paddingBottom="5">
+
+
+	<mx:Script>
+	<![CDATA[
+
+		import mx.core.Container;
+		import mx.containers.Panel;
+		import mx.controls.CheckBox;
+
+		import core.Cloud;
+		import events.*;
+
+
+		[Bindable]
+		private var m_cloud:Cloud = null;
+
+
+		// Changed the selected cloud in the cloud tree or canvas
+		public function SetCloud(sCloud:Cloud):void
+		{
+			m_cloud = sCloud;
+
+			InitAccHeader("Repeat");
+			InitAccHeader("Warp");
+		}
+
+		// Called each time the Cloud change, set the modifier enable
+		private function InitAccHeader(modifierName:String):void
+		{
+			var modifierIndex:int = modifierAcc.getChildIndex(modifierAcc.getChildByName(modifierName)); // retreive position of the modifier
+			var cloudModifierHeader:CloudModifierHeader = modifierAcc.getHeaderAt(modifierIndex) as CloudModifierHeader;
+			if(cloudModifierHeader)
+			{
+				cloudModifierHeader.remoteSelect = true;
+				cloudModifierHeader.selected = m_cloud.cloudModifiers.IsModifierEnabled(modifierName);
+			}
+		}
+
+
+		// Called by the accordion headers when a filter checkbox is check or uncheck
+		public function EnableModifier(modifierName:String, checked:Boolean):void
+		{
+			
+		}
+
+
+	]]>
+	</mx:Script>
+
+
+	<mx:Accordion id="modifierAcc" width="100%" height="100%"
+		creationPolicy="auto" historyManagementEnabled="false" 
+		resizeToContent="false"
+		headerRenderer="panels.right.CloudModifierHeader"
+		selectedIndex="{modifierAcc.numChildren-1}"
+
+		borderStyle="solid" borderSides="top" borderColor="0xc0c0ee" borderThickness="1" cornerRadius="0" 
+		paddingLeft="2" paddingRight="2">
+
+
+		<!-- REPEAT MODIFIER -->
+		<mx:Form id="repeatModifierBox" name="Repeat" label="Repeat"
+			enabled="false"
+			width="100%"
+			styleName="ModifierForm">
+		</mx:Form>
+
+		<!-- SPIRAL MODIFIER -->
+		<mx:Form id="warpModifierBox" name="Warp" label="Warp"
+			enabled="false"
+			width="100%"
+			styleName="ModifierForm">
+		</mx:Form>
+
+	</mx:Accordion>
+
+
+	<mx:Style>
+
+		.ModifierForm
+		{
+			background-color: #FFFFFF; background-alpha: 1.0;
+			horizontalAlign: left; verticalAlign: middle;
+			horizontalGap:5; verticalGap:5;
+			paddingTop: 5; paddingLeft: 5; paddingRight: 5; paddingBottom: 5;
+		   	borderStyle: solid; borderColor: #C0C0EE; borderThickness: 1; borderSides: top,bottom; 
+		   	cornerRadius: 30;
+		   	indicatorGap: 10;
+  		}
+
+		.ModifierFormCheckBox
+		{
+			verticalGap:0; horizontalAlign:left;
+			borderStyle:solid; cornerRadius:15;
+			paddingTop:3; paddingLeft:10; paddingRight:5; paddingBottom:3;
+		}
+
+	</mx:Style>
+
+
+</mx:VBox>

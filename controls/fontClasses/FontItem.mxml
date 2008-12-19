@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Label xmlns:mx="http://www.adobe.com/2006/mxml"
+	width="100%" height="100%"
+	toolTip="{font.name}"
+
+	fontFamily="{font.name}"
+	text="{font.name}"
+	fontSize="18"
+  	textAlign="left"
+  	buttonMode="true"
+
+	paddingLeft="2" paddingTop="2" paddingRight="2" paddingBottom="2"
+
+	creationComplete="onCreationComplete()"
+ 	dataChange="onDataChange(event)">
+
+
+	<mx:Script>
+	<![CDATA[
+
+		import core.Cloud;
+
+
+		//[Bindable]
+		//private var bitmap:Bitmap = new Bitmap();
+
+		[Bindable]
+		private var font:CloudFont = null;
+
+
+		private function onCreationComplete():void
+		{
+			
+		}
+
+		private function onDataChange(event:Event):void
+		{
+			font = this.data as CloudFont;
+
+			if(!font)
+				return;
+
+			//bitmap = font.bitmap;
+		}
+
+	]]>
+    </mx:Script>
+
+</mx:Label>

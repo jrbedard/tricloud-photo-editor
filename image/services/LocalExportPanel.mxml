@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml" 
+	width="100%" height="100%"
+
+ 	styleName="ImageService"
+
+	creationComplete="onCreationComplete()">
+
+
+	<mx:Script>
+    <![CDATA[
+
+    	import mx.controls.Image;
+		import mx.controls.Alert;
+		import mx.controls.ProgressBar;
+		import mx.managers.CursorManager;
+
+		import image.ExportDialog;
+
+
+    	private var fileRef:FileReference = new FileReference(); // For image download
+
+
+		[Bindable]
+		public var progressBar:ProgressBar = null;
+
+		[Bindable]
+		public var serverTempImagePath:String = ''; // Path of the temp image on the server
+
+		[Bindable]
+		public var suggestedFileName:String = ''; // Suggested file name for download
+
+
+		
+		private function onCreationComplete():void
+		{
+			fileRef.addEventListener(Event.SELECT, onSelectFile); // listen for "ok" click 
+			fileRef.addEventListener(Event.CANCEL, onCancelSelectFile); // listen for "ok" click 
+		
+			// download progress
+			fileRef.addEventListener(Event.OPEN, onDownloadStarted);
+			fileRef.addEventListener(ProgressEvent.PROGRESS, onDownloadProgress);
+			fileRef.addEventListener(Event.COMPLETE, onDownloadCompleted);
+
+			// download errors
+			fileRef.addEventListener(SecurityErrorEvent.SECURITY_ERROR, onSecurityError);
+			fileRef.addEventListener(HTTPStatusEvent.HTTP_STATUS, onHttpError);
+			fileRef.addEventListener(IOErrorEvent.IO_ERROR, onIOError);
+
+			// Listen for temp image saved on server
+			ExportDialog(this.parentDocument).addEventListener('tempImageSaved', onDownloadFile);
+		}
+
+
+		// DOWNLOAD: for ExportDialog
+
+		// Browse the image file to upload
+		private function onClickExport():void
+		{
+			ExportDialog(this.parentDocument).SaveTempImageOnServer(); // Save temp image on server first
+
+			// wait for the image to be saved then, the event 'tempImageSaved' will be dispatched by ExportDialog
+			// Kind of an hack if you ask me, but heh!
+		}
+
+
+		private function onDownloadFile(event:Event):void
+		{
+			if(!serverTempImagePath)
+			{
+				CloudAlert.show('invalid FileName', 'Export Error');
+			}
+
+			// DOWNLOAD
+			var request:URLRequest = new URLRequest();
+            request.url = serverTempImagePath;
+            request.method = URLRequestMethod.GET;
+            //request.data = new URLVariables("id=2");
+
+			try
+		    {
+            	fileRef.download(request, suggestedFileName); // Download file
+      		}
+      		catch(error:Error)
+		    {
+		        CloudAlert.show("Unable to download file.", "File Download");
+		    }
+		}
+
+		// On image file selected
+		private function onSelectFile(event:Event):void
+		{
+			
+		}
+
+		private function onCancelSelectFile(event:Event):void
+		{
+			CursorManager.removeBusyCursor();
+		}
+
+
+		// Download PROGRESS
+		private function onDownloadStarted(event:Event):void
+		{
+			CursorManager.setBusyCursor();
+
+			progressBar.visible = true;
+			progressBar.setProgress(0, 0);
+		}
+
+		private function onDownloadProgress(event:ProgressEvent):void
+		{
+			progressBar.setProgress(event.bytesLoaded, event.bytesTotal);
+			progressBar.label = "Downloading '" + fileRef.name + "' " + 
+				Globals.GetFileSize(event.bytesLoaded) + "/" + Globals.GetFileSize(event.bytesTotal) + " bytes...";
+		}
+
+		// Download Completed
+		private function onDownloadCompleted(event:Event):void
+		{
+		   	//CloudAlert.show("downloaded");
+
+			progressBar.visible = false;
+		   	CursorManager.removeBusyCursor();
+		}
+
+
+		// Download ERRORS
+		private function onSecurityError(securityErrorEvent:SecurityErrorEvent):void
+		{
+			progressBar.visible = false;
+			CursorManager.removeBusyCursor();
+			CloudAlert.show(securityErrorEvent.text, "Security Error");
+		}
+		private function onHttpError(httpStatusEvent:HTTPStatusEvent):void
+		{
+			progressBar.visible = false;
+			CursorManager.removeBusyCursor();
+			CloudAlert.show(httpStatusEvent.type, "Http Error");
+		}
+		private function onIOError(ioErrorEvent:IOErrorEvent):void
+		{
+			progressBar.visible = false;
+			CursorManager.removeBusyCursor();
+			CloudAlert.show(ioErrorEvent.text, "IO Error");
+		}
+
+
+    ]]>
+    </mx:Script>
+
+
+	<mx:Label id="exportLabel" text="Export an Image to my local hard drive.." fontStyle="italic" />
+
+	<mx:HBox horizontalAlign="left">	
+		<mx:Label text="Save Image:" />
+		<mx:Button id="saveBtn" label="Save" click="onClickExport()" />
+	</mx:HBox>
+
+</mx:VBox>

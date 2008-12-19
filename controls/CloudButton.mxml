@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Button xmlns:mx="http://www.adobe.com/2006/mxml" 
+	selectedUpSkin="controls.skins.CloudButtonSkin"
+	selectedOverSkin="controls.skins.CloudButtonSkin"
+	upSkin="controls.skins.CloudButtonSkin"
+	overSkin="controls.skins.CloudButtonSkin"
+	downSkin="controls.skins.CloudButtonSkin"
+	selectedDownSkin="controls.skins.CloudButtonSkin"
+	disabledSkin="controls.skins.CloudButtonSkin"
+	selectedDisabledSkin="controls.skins.CloudButtonSkin"
+	buttonMode="true"
+	useHandCursor="true"
+	>
+
+	<mx:Script>
+    <![CDATA[
+
+		
+
+
+	]]>
+    </mx:Script>
+
+</mx:Button>

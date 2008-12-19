@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml"
+	width="48" height="48"
+	clipContent="true"
+
+	mouseDown="onMouseDownPanTarget(event)"
+	creationComplete="onCreationComplete()">
+
+
+	<mx:Script>
+    <![CDATA[
+    	import mx.core.UIComponent;
+
+
+		[Bindable]
+		public var target:UIComponent = null;
+
+		private var initCursorPos:Point = new Point();
+		private var initTargetPos:Point = new Point();
+
+
+		private function onCreationComplete():void
+        {
+        	DrawPanView();
+        }
+
+		private function onMouseDownPanTarget(event:MouseEvent):void
+		{
+			MouseDownPanTarget(event.stageX, event.stageY);
+		}
+
+		// Can be called from Product view
+		public function MouseDownPanTarget(posX:Number, posY:Number):void
+		{
+			initCursorPos.x = posX;
+			initCursorPos.y = posY;
+
+			initTargetPos.x = target.x;
+			initTargetPos.y = target.y;
+
+			target.parentApplication.addEventListener(MouseEvent.MOUSE_MOVE, onMouseMoveApp);
+			target.parentApplication.addEventListener(MouseEvent.MOUSE_UP, onMouseUpApp);
+
+			CloudCursor.SetCursor(CloudCursor.TRANSLATE);
+		}
+
+
+		private function onMouseMoveApp(event:MouseEvent):void
+		{
+			target.x = initTargetPos.x + (event.stageX - initCursorPos.x);
+			target.y = initTargetPos.y + (event.stageY - initCursorPos.y);
+
+			DrawPanView();
+		}
+
+		private function onMouseUpApp(event:MouseEvent):void
+		{
+			target.parentApplication.removeEventListener(MouseEvent.MOUSE_MOVE, onMouseMoveApp);
+			target.parentApplication.removeEventListener(MouseEvent.MOUSE_UP, onMouseUpApp);
+
+			CloudCursor.SetCursor(CloudCursor.NORMAL);
+		}
+
+
+		public function DrawPanView():void
+		{
+			if(!target || !target.parent)
+				return;
+
+			const iconSize:int = 48;
+
+			var view:DisplayObjectContainer = target.parent;
+
+			// Build view Rect
+			//var viewRatio:Number = view.width / view.height;
+			var viewRect:Rectangle = view.getBounds(view);
+
+			//var targetRatio:Number = target.width / target.height;
+			var targetRect:Rectangle = target.getBounds(view);
+
+			var recWidth:uint;
+			var recHeight:uint;
+
+			// If Product Panel larger than view (zoom > 100%)
+			if(targetRect.width >= viewRect.width &&
+			   targetRect.height >= viewRect.height)
+			{
+				var targetLeft:int = targetRect.left;
+				var targetTop:int = targetRect.top;
+
+				targetRect = new Rectangle(0,0, iconSize, iconSize);
+
+				recWidth = viewRect.width;
+				recHeight = viewRect.height;
+
+				viewRect.left /= target.width;
+				viewRect.left *= targetRect.width;
+				viewRect.left -= (targetLeft / recWidth) * targetRect.width; // view offset
+
+				viewRect.width = recWidth / target.width;
+				viewRect.width *= targetRect.width;
+
+
+				viewRect.top /= target.height;
+				viewRect.top *= targetRect.height;
+				viewRect.top -= (targetTop / recHeight) * targetRect.height; // view offset
+
+				viewRect.height = recHeight / target.height;
+				viewRect.height *= targetRect.height;
+
+				// Clip View to ProductPanel
+				viewRect = viewRect.intersection(targetRect);	
+			}
+			else // View Larget than Product Panel
+			{
+				viewRect = new Rectangle(0,0, iconSize, iconSize);
+
+				recWidth = targetRect.width;
+				recHeight = targetRect.height;
+	
+				targetRect.left /= view.width;
+				targetRect.left *= viewRect.width;
+	
+				targetRect.width = recWidth / view.width;
+				targetRect.width *= viewRect.width;
+	
+	
+				targetRect.top /= view.height;
+				targetRect.top *= viewRect.height;
+
+				targetRect.height = recHeight / view.height;
+				targetRect.height *= viewRect.height;
+
+				// Clip ProductPanel to View
+				targetRect = targetRect.intersection(viewRect);
+			}
+
+
+			this.graphics.clear();
+
+			// Draw Target
+			this.graphics.lineStyle(1, 0xFF0000, 0.5);
+			this.graphics.drawRect(targetRect.left,  targetRect.top,
+								   targetRect.width, targetRect.height);
+
+			// Draw View
+			this.graphics.lineStyle(1, 0x000000, 0.5);
+			this.graphics.drawRect(viewRect.left,  viewRect.top,
+								   viewRect.width, viewRect.height);
+
+		}
+
+  	]]>
+    </mx:Script>
+
+
+	<mx:Fade id="fadeIn" target="{this}" alphaFrom="0.25" alphaTo="1.0" duration="200" />
+	<mx:Fade id="fadeOut" target="{this}" alphaFrom="1.0" alphaTo="0.25" duration="200" />
+
+</mx:Canvas>

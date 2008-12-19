@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml" 
+	width="90" height="15" 
+	creationComplete="onCreationComplete()"
+	dataChange="onDataChange(event)">
+
+
+	<mx:Script>
+	<![CDATA[
+
+		import mx.events.ListEvent;
+
+	
+		[Bindable]
+		private var cloudName:String = '';
+
+
+		private function onCreationComplete():void
+		{
+			
+		}
+
+
+		private function onDataChange(event:Event):void
+		{
+			cloudNameText.text = this.data.@name;
+			this.name = cloudNameText.text;
+			cloudNameText.setSelection(0, cloudNameText.length-1);
+		}
+
+
+		private function onChangeCloudName():void
+		{
+			this.name = cloudNameText.text;
+		}
+
+	]]>
+    </mx:Script>
+
+	<mx:TextInput id="cloudNameText" 
+		width="100%" height="100%" text="{cloudName}"
+		maxChars="32"
+		change="onChangeCloudName()"
+		enter="this.dispatchEvent(new Event('cloudNameEditEnd', true))" />
+
+</mx:VBox>

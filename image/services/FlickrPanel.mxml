@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml" 
+	width="100%" height="100%"
+
+	styleName="ImageService"
+
+	creationComplete="onCreationComplete()">
+
+
+	<mx:Script>
+    <![CDATA[
+
+		import mx.controls.Image;
+		import mx.controls.Alert;
+		import mx.controls.ProgressBar;
+		import mx.controls.SWFLoader;
+
+
+		[Bindable]
+		public var progressBar:ProgressBar = null;
+
+
+		private function onCreationComplete():void
+		{
+			
+		}
+
+		private function onClickDownloadImg():void
+		{
+			
+		}
+
+	]]>
+    </mx:Script>
+
+
+	<mx:Label text="Import Images from Flickr." fontStyle="italic" />
+
+
+</mx:VBox>

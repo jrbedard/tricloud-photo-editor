@@ -1,0 +1,1025 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:cloudControls="controls.*" 
+	xmlns:colorClasses="controls.colorClasses.*"
+	width="100%" height="100%"
+	currentState="normal"
+
+	verticalGap="2" horizontalAlign="left"
+
+	initialize="onInitialize()"
+	creationComplete="onCreationComplete()">
+
+
+	<mx:Script>
+    <![CDATA[
+    	import mx.controls.Image;
+		import mx.utils.ObjectUtil;
+
+		import controls.colorClasses.SolidHSB;
+		import type.DrawCloud;
+		import type.ImageCloud;
+
+
+
+		// CheckerBoard background
+		private var backgroundBmp:Bitmap = Globals.g_assets.backgroundBmp;
+
+
+
+		[Embed(source="color.swf", symbol="osi_hsb_h")]
+		internal var osi_hsb_h:Class;
+		
+		[Embed(source="color.swf", symbol="osi_hsb_s")]
+		internal var osi_hsb_s:Class;
+
+		[Embed(source="color.swf", symbol="osi_hsb_b")]
+		internal var osi_hsb_b:Class;
+
+		[Embed(source="color.swf", symbol="osi_rgb_r")]
+		internal var osi_rgb_r:Class;
+		
+		[Embed(source="color.swf", symbol="osi_rgb_g")]
+		internal var osi_rgb_g:Class;
+		
+		[Embed(source="color.swf", symbol="osi_rgb_b")]
+		internal var osi_rgb_b:Class;
+	
+
+		[Bindable]
+		[Embed(source="color.swf", symbol="cc_marker")]
+		internal var cc_marker:Class;
+
+		[Bindable]
+		[Embed(source="color.swf", symbol="cc_ld_marker")]
+		internal var cc_l_marker:Class;
+
+		[Bindable]
+		[Embed(source="color.swf", symbol="cc_rd_marker")]
+		internal var cc_r_marker:Class;
+
+
+
+		private var m_parent:DisplayObject = null;
+
+
+
+
+
+
+		// CURRENT COLOR & ALPHA
+
+		[Bindable]
+		private var _color:uint = 0x000000;
+
+		[Bindable]
+		private var _alpha:Number = 1.0;
+
+
+		private var position:Object = { x:0, y:0, p: 0}; // Pointer position
+
+
+
+		private function onInitialize():void
+		{
+			var i:uint = 0;//uint(App.get_so_prop("color_picker_window_mode", ""));    
+
+		    //mode = (i >> 8) & 1;
+		    mode = 1;
+
+		    var sel:uint = i & 0xFF;
+		    //if (sel > 2) sel = 0;
+		    sel = 0;
+
+		    if (mode == 0) sel_rgb = sel; else sel_hsb = sel;
+		}
+
+
+		private function onCreationComplete():void
+		{
+			startInit();
+
+			// First time
+			color = ColorDialog(this.parentDocument).oldColor;
+			alpha = ColorDialog(this.parentDocument).oldAlpha;
+			DrawOldColorSwatch(color, alpha);
+			DrawColorSwatch();
+		}
+
+
+		private function startInit():void
+		{
+		    hsb = SolidHSB.rgb_to_hsb(color);
+		    update_hex_rgb();
+		    update_position();
+		    ob_hsb = hsb.to_object();
+
+
+		    if (mode == 0)
+		    {
+		        if (sel_rgb == 0) rb_r.selected = true;
+		        else
+		        if (sel_rgb == 1) rb_g.selected = true;
+		        else
+		        if (sel_rgb == 2) rb_b.selected = true;
+		        on_rb_rgb_change();
+		    }
+		    else
+		    {
+		        if (sel_hsb == 0) rb_H.selected = true;
+		        else
+		        if (sel_hsb == 1) rb_S.selected = true;
+		        else
+		        if (sel_hsb == 2) rb_B.selected = true;
+		        on_rb_hsb_change();
+		    }
+
+		}
+
+
+		private const swatchDiameter:uint = 42;
+
+		// Draw Old Color Swatch
+		public function DrawOldColorSwatch(oldColor:uint, oldAlpha:Number):void
+		{
+			oldColorSwatch.graphics.clear();
+
+			// checkerboard background
+			oldColorSwatch.graphics.beginBitmapFill(backgroundBmp.bitmapData);
+			oldColorSwatch.graphics.drawEllipse(1, 1, swatchDiameter, swatchDiameter);
+			oldColorSwatch.graphics.endFill();
+
+			oldColorSwatch.graphics.lineStyle(0, 0x000000, 0.0);
+			oldColorSwatch.graphics.beginFill(oldColor, oldAlpha);
+			oldColorSwatch.graphics.drawEllipse(1, 1, swatchDiameter, swatchDiameter);
+			oldColorSwatch.graphics.endFill();
+		}
+
+
+
+		// Draw checkerboard background to notice alpha here
+		private function DrawBackground():void
+		{
+			colorSwatch.graphics.clear();
+
+			var matrix:Matrix = new Matrix();
+			matrix.translate(-swatchDiameter/2, 0);
+
+			// checkerboard background
+			colorSwatch.graphics.beginBitmapFill(backgroundBmp.bitmapData, matrix);
+			colorSwatch.graphics.drawEllipse(-swatchDiameter/2, 1, swatchDiameter, swatchDiameter);
+			colorSwatch.graphics.endFill();
+		}
+
+		// Draw New Color Swatch
+		private function DrawColorSwatch():void
+		{
+			DrawBackground();
+
+			colorSwatch.graphics.lineStyle(0, 0x000000, 0.0);
+			colorSwatch.graphics.beginFill(_color, _alpha);
+			colorSwatch.graphics.drawEllipse(-swatchDiameter/2, 1, swatchDiameter, swatchDiameter);
+			colorSwatch.graphics.endFill();
+		}
+
+
+		// Color Picker
+		private function onClickColorPicker(event:MouseEvent):void
+		{
+			if(!eyeDropper.selected) // already selected
+			{
+				this.parentApplication.removeEventListener(MouseEvent.MOUSE_MOVE, onMouseMoveColorPicker);
+				this.parentApplication.removeEventListener(MouseEvent.CLICK, onClickAppWithColorPicker);
+			}
+			else
+			{
+				this.parentApplication.addEventListener(MouseEvent.MOUSE_MOVE, onMouseMoveColorPicker);
+				this.parentApplication.addEventListener(MouseEvent.CLICK, onClickAppWithColorPicker);
+			}
+		}
+
+
+		// Move with Color Picker
+		private function onMouseMoveColorPicker(event:MouseEvent):void
+		{
+			var argb:uint = 0;
+
+			if(event.target is Image) // Image
+			{
+				var img:Image = Image(event.target);
+				if(img)
+				{
+					var imgBmp:Bitmap = Bitmap(img.content);
+					if(imgBmp && imgBmp.bitmapData)
+					{
+						argb = imgBmp.bitmapData.getPixel32(event.localX, event.localY);
+						this.selectedAlpha = (argb >> 24 & 0xFF) / 255;
+						this.color = (argb & 0x00FFFFFF);
+					}
+				}
+			}
+			if(event.target is DrawCloud) // Doesnt work
+			{
+				var drawCloud:DrawCloud = DrawCloud(event.target);
+				if(drawCloud)
+				{
+					var drawBmp:Bitmap = Bitmap(drawCloud.drawImage.content);
+					if(drawBmp && drawBmp.bitmapData)
+					{
+						argb = drawBmp.bitmapData.getPixel32(event.localX, event.localY);
+						this.selectedAlpha = (argb >> 24 & 0xFF) / 255;
+						this.color = (argb & 0x00FFFFFF);
+					}
+				}
+			}
+			else if(event.target is ImageCloud) // IMAGE CLOUD
+			{
+				var imageCloud:ImageCloud = ImageCloud(event.target);
+				if(imageCloud)
+				{
+					var imageBmp:Bitmap = Bitmap(imageCloud.imageTag.content);
+					if(imageBmp && imageBmp.bitmapData)
+					{
+						argb = imageBmp.bitmapData.getPixel32(event.localX, event.localY);
+						this.selectedAlpha = (argb >> 24 & 0xFF) / 255;
+						this.color = (argb & 0x00FFFFFF);
+					}
+				}
+			}
+		}
+
+		// Click application with Color Picker
+		private function onClickAppWithColorPicker(event:MouseEvent):void
+		{
+			eyeDropper.selected = false;
+
+			this.parentApplication.removeEventListener(MouseEvent.MOUSE_MOVE, onMouseMoveColorPicker);
+			this.parentApplication.removeEventListener(MouseEvent.CLICK, onClickAppWithColorPicker);	
+		}
+
+
+
+		private static function rgb_to_position(color:uint, n:uint):Object
+		{
+		    var r:uint = (color >> 16) & 0xFF;
+		    var g:uint = (color >> 8) & 0xFF;
+		    var b:uint = color & 0xFF;
+		
+		    if (n == 0) return { p:r, x:b, y:g };
+		    if (n == 1) return { p:g, x:b, y:r };    
+		    if (n == 2) return { p:b, x:r, y:g };
+		    
+		    return { p:0, x:0, y:0 };
+		}
+
+		private static function position_to_rgb(pos:Object, n:uint):uint
+		{
+		    var r:uint = 0, g:uint = 0, b:uint = 0;
+		    if (n == 0) { r = pos.p; b = pos.x; g = pos.y; }
+		    if (n == 1) { g = pos.p; b = pos.x; r = pos.y; }
+		    if (n == 2) { b = pos.p; r = pos.x; g = pos.y; }
+		
+		    return ((r & 0xFF) << 16) | ((g & 0xFF) << 8) | (b & 0xFF);
+		}
+
+
+		private var ba:ByteArray = new ByteArray();
+
+		private function change_rcx2_rgb(color:uint, n:uint):void
+		{
+		    if (n > 3) return;
+		    var dx:uint = 0;
+		    var dy:uint = 0;
+		    var clr:uint;
+		    
+		    if (n == 0) { clr = color & 0xFF0000 | 0x00FF00; dx = 0x000001; dy = 0x000100; }
+		    if (n == 1) { clr = color & 0x00FF00 | 0xFF0000; dx = 0x000001; dy = 0x010000; }
+		    if (n == 2) { clr = color & 0x0000FF | 0x00FF00; dx = 0x010000; dy = 0x000100; }
+		
+		    var c:uint = clr;
+		    for (var y:uint = 0; y < 256; y++) {
+		        for (var x:uint = 0; x < 256; x++) {        
+		            ba.writeInt(c);
+		            solidCanvas.bd.setPixel(x, y, c);
+		            c += dx;
+		        }
+		        c = (clr -= dy);
+		    }
+		    change_rcx2_rgb_matrix(color, n);
+		}
+		
+		private function change_rcx2_rgb_matrix(color:uint, n:uint):void
+		{
+		    if (n > 3) return;
+		
+		    var r:uint = (color >> 16) & 0xFF;
+		    var g:uint = (color >> 8) & 0xFF;
+		    var b:uint = color & 0xFF;
+
+		    var a:Array = 
+		    [
+		        1,0,0,0,0,
+		        0,1,0,0,0,
+		        0,0,1,0,0,
+		        0,0,0,1,0
+		    ];
+
+		    if (n == 0) { a[0]  = 0; a[4]  = r; }
+		    if (n == 1) { a[6]  = 0; a[9]  = g; }
+		    if (n == 2) { a[12] = 0; a[14] = b; }
+
+		    var filter:ColorMatrixFilter = new ColorMatrixFilter(a);
+		    solidCanvas.bd.applyFilter(solidCanvas.bd, new Rectangle(0,0,256,256), new Point(0,0), filter);
+		}
+		
+		
+		private static function hsb_to_position(hsb:SolidHSB, n:uint):Object
+		{
+		    if (n > 3) return {x:0, y:0, p:0};
+
+		    var dc:Object = {h: 360, s:100, b:100};
+		    var cp:String, cx:String, cy:String;
+		    if (n == 0) { cp = 'h'; cx = 's'; cy = 'b'; }
+		    if (n == 1) { cp = 's'; cx = 'h'; cy = 'b'; }
+		    if (n == 2) { cp = 'b'; cx = 'h'; cy = 's'; }
+
+		    var dx:uint = dc[cx];
+		    var dy:uint = dc[cy];
+		    var dp:uint = dc[cp];
+
+		    return {
+		        x:uint(hsb[cx] / dx * 255), 
+		        y:uint(hsb[cy] / dy * 255), 
+		        p:uint(hsb[cp] / dp * 255)
+		    };
+		}
+		
+		private static function position_to_hsb(pos:Object, n:uint):SolidHSB
+		{
+		    var h:uint = 0, s:uint = 0, b:uint = 0;
+		    if (n == 0) { h = pos.p; s = pos.x; b = pos.y; }
+		    if (n == 1) { s = pos.p; h = pos.x; b = pos.y; }
+		    if (n == 2) { b = pos.p; h = pos.x; s = pos.y; }
+
+		    return new SolidHSB(Math.round(h / 255 * 360), Math.round(s / 255 * 100), Math.round(b / 255 * 100));
+		}
+		
+		
+		private function change_rcx2_hsb(hsb:SolidHSB, n:uint):void
+		{
+		    if (n > 3) return;
+		    var o:SolidHSB = new SolidHSB(hsb.h, hsb.s, hsb.b);
+		    var dc:Object = {h: 360, s:100, b:100};
+		    var cx:String, cy:String;
+		    if (n == 0) { cx = 's'; cy = 'b'; }
+		    if (n == 1) { cx = 'h'; cy = 'b'; }
+		    if (n == 2) { cx = 'h'; cy = 's'; }
+		
+		    var dx:uint = dc[cx];
+		    var dy:uint = dc[cy];
+		    var x:int, y:int;
+		
+		    ba.position = 0;
+		    if (n == 0) { 
+		        for (y = 255; y >= 0; y--) {
+		            o.b = (Number(y) / 255) * dy;
+		            for (x = 0; x < 256; x++) {        
+		                o.s = (Number(x) / 255) * dx;            
+		                ba.writeInt(SolidHSB.hsb_to_rgb(o));
+		            }
+		        }
+		    }
+		    else
+		    if (n == 1) { 
+		        for (y = 255; y >= 0; y--) {
+		            o.b = (Number(y) / 255) * dy;
+		            for (x = 0; x < 256; x++) {        
+		                o.h = (Number(x) / 255) * dx;            
+		                ba.writeInt(SolidHSB.hsb_to_rgb(o));
+		            }
+		        }
+		    }
+		    else 
+		    if (n == 2) { 
+		        for (y = 255; y >= 0; y--) {
+		            o.s = (Number(y) / 255) * dy;
+		            for (x = 0; x < 256; x++) {        
+		                o.h = (Number(x) / 255) * dx;            
+		                ba.writeInt(SolidHSB.hsb_to_rgb(o));
+		            }
+		        }
+		    }
+		
+		    ba.position = 0;
+		    solidCanvas.bd.setPixels(new Rectangle(0, 0, 256, 256), ba);
+		}
+
+		private function change_rcx1_rgb(color:uint, n:uint):void
+		{
+		    if (n > 3) return;
+		    var dy:uint = 0x010101;
+		    var c:uint = 0;
+		
+		    for (var y:int = 255; y >= 0; y--, c += dy) {
+		        for (var x:int = 0; x < 22; x++) {        
+		            solidBar.bd.setPixel(x, y, c);
+		        }
+		    }
+		    change_rcx1_rgb_matrix(color, n);
+		}
+		
+		private function change_rcx1_rgb_matrix(color:uint, n:uint):void
+		{
+		    if (n > 3) return;
+		
+		    var r:uint = (color >> 16) & 0xFF;
+		    var g:uint = (color >> 8) & 0xFF;
+		    var b:uint = color & 0xFF;
+		
+		    var a:Array = 
+		    [
+		        0,0,0,0,r,
+		        0,0,0,0,g,
+		        0,0,0,0,b,
+		        0,0,0,1,0
+		    ];
+		
+		    if (n == 0) { a[0]  = 1; a[4] = 0; }
+		    if (n == 1) { a[6]  = 1; a[9] = 0; }
+		    if (n == 2) { a[12] = 1; a[14] = 0; }
+		
+		    var filter:ColorMatrixFilter = new ColorMatrixFilter(a);
+		    solidBar.bd.applyFilter(solidBar.bd, new Rectangle(0,0,22,256), new Point(0,0), filter);
+		}
+
+
+		private function change_rcx1_hsb(hsb:SolidHSB, n:uint):void
+		{
+		    if (n > 3) return;
+		    var d:uint = 0;
+		    var o:SolidHSB = new SolidHSB(hsb.h, hsb.s, hsb.b);
+		    var m:String = "";
+		    
+		    if (n == 0) { m = "h"; d = 360; o.s = 100; o.b = 100; }
+		    if (n == 1) { m = "s"; d = 100; }
+		    if (n == 2) { m = "b"; d = 100; }
+
+		    for (var y:int = 0; y < 256; y++)
+		    {
+		        o[m] = (y / 255) * d;
+		        var c:uint = SolidHSB.hsb_to_rgb(o);
+		        for (var x:int = 0; x < 22; x++) {        
+		            solidBar.bd.setPixel(x, 255 - y, c);
+		        }
+		    }		
+		}
+
+
+		private function set_cc_marker():void
+		{
+		    var x:uint = 0;
+		    var y:uint = 0;
+
+		    x = position.x + solidCanvas.x - 5; // JRB: Take into account the position of the solidCanvas
+		    y = position.y + solidCanvas.y + 5;
+
+		    ccm.x = x + 8; ccm.y = 255 - y + 8;
+
+		    y = position.p;
+
+		    cclm.y = ccrm.y = 255 - y + 8 - 5;
+		    ccrm.x = 0;
+		    cclm.x = 29;
+		}
+
+
+
+		[Bindable]
+		private var hsb:SolidHSB = new SolidHSB();
+		
+		[Bindable]
+		private var ob_hsb:Object = hsb.to_object();
+		
+		
+		[Bindable]
+		private var mode:uint = 0;
+		
+		[Bindable]
+		private var old_color:uint = 0;
+		
+		[Bindable]
+		private var sel_rgb:uint = 0;
+		
+		[Bindable]
+		private var sel_hsb:uint = 0;
+
+
+
+		public function set color(c:uint):void
+		{
+		    _color = c;
+		   this.dispatchEvent(new ColorEvent("colorChange", _color, _alpha));
+		   DrawColorSwatch();
+		}
+		[Bindable]
+		public function get color():uint
+		{
+		    return _color;
+		}
+
+
+		public function set selectedAlpha(a:Number):void
+		{
+			_alpha = a;
+			this.dispatchEvent(new ColorEvent("alphaChange", _color, _alpha));
+			DrawColorSwatch();
+		}
+		[Bindable]
+		public function get selectedAlpha():Number
+		{
+		    return _alpha;
+		}
+
+
+
+		public static function get current_color():uint
+		{
+		    return 0; //(wnd != null) ? wnd._color : 0;
+		}
+
+		private function on_tx_hex_change():void
+		{
+		    var s:String = hexrgb.text.toUpperCase();
+		    var d:String = '';
+		    for (var i:int = 0; i < s.length; i++) {
+		        var c:int = s.charCodeAt(i);
+		        if ((c < 48 || c > 57) && (c < 65 || c > 70)) continue;
+		        d += String.fromCharCode(c);
+		    }
+		
+		    hexrgb.text = d;
+		    color = uint(d == '' ? 0 : '0x' + d);
+		    
+		    hsb = SolidHSB.rgb_to_hsb(color);
+		
+		    update_position();
+		    ob_hsb = hsb.to_object();
+		    redraw_bars();    
+		}
+		
+		
+		private function on_rb_rgb_change():void
+		{
+		    sel_rgb = uint(-1);
+		    mode = 0;
+		
+		    var ic:Class;
+		
+		    if (rb_r.selected) { sel_rgb = 0; ic = osi_rgb_r; }
+		    else
+		    if (rb_g.selected) { sel_rgb = 1; ic = osi_rgb_g; }
+		    else
+		    if (rb_b.selected) { sel_rgb = 2; ic = osi_rgb_b; }
+		
+		    osi_view.source = ic;
+		
+		    position = rgb_to_position(color, sel_rgb);
+		    update_hex_rgb();
+		    redraw_bars();
+		}
+		
+		
+		private function on_rb_hsb_change():void
+		{
+		    sel_hsb = uint(-1);
+		    mode = 1;
+		
+		    var ic:Class;
+		
+		    if (rb_H.selected) { sel_hsb = 0; ic = osi_hsb_h; }
+		    else
+		    if (rb_S.selected) { sel_hsb = 1; ic = osi_hsb_s; }
+		    else
+		    if (rb_B.selected) { sel_hsb = 2; ic = osi_hsb_b; }
+		
+		    osi_view.source = ic;
+		
+		    position = hsb_to_position(hsb, sel_hsb);
+		    update_hex_rgb();
+		    redraw_bars();
+		}
+		
+		
+		private function on_tx_rgb_change():void
+		{
+		    color = ((tx_r.value & 0xFF) << 16) + ((tx_g.value & 0xFF) << 8) + (tx_b.value & 0xFF)
+		    hsb = SolidHSB.rgb_to_hsb(color);
+		    update_hex_rgb();
+		    update_position();
+		    ob_hsb = hsb.to_object();
+		    redraw_bars();
+		}
+		
+		private function on_tx_hsb_change():void
+		{
+		    hsb = new SolidHSB( tx_H.value, tx_S.value, tx_B.value );
+		    color = SolidHSB.hsb_to_rgb(hsb);
+		    update_hex_rgb();
+		    update_position();
+		    ob_hsb = hsb.to_object();
+		    redraw_bars();    
+		}
+		
+		private function redraw_bars():void
+		{
+		    if (mode == 0) {
+		        change_rcx1_rgb(color, sel_rgb);
+		        change_rcx2_rgb(color, sel_rgb);
+		        set_cc_marker();
+		    }
+		    else {
+		        change_rcx1_hsb(hsb, sel_hsb);
+		        change_rcx2_hsb(hsb, sel_hsb);
+		        set_cc_marker();        
+		    }
+		
+		}
+		
+		private function update_position():void
+		{
+		    if (mode == 0) position = rgb_to_position(color, sel_rgb);
+		    else
+		    if (mode == 1) position = hsb_to_position(hsb, sel_hsb);
+		}
+		
+		private function on_restore_color():void
+		{
+		    color = old_color;
+		    startInit();
+		}
+
+
+
+		// EVENTS
+
+		private function on_ccc_mouse_down(event:MouseEvent):void
+		{
+		    stage.addEventListener(MouseEvent.MOUSE_MOVE, on_ccc_mouse_mov, true);
+		    stage.addEventListener(MouseEvent.MOUSE_UP, on_ccc_mouse_up, true);
+		    on_ccc_md();
+		}
+		
+		private function on_ccc_mouse_up(event:MouseEvent):void
+		{
+		    stage.removeEventListener(MouseEvent.MOUSE_MOVE, on_ccc_mouse_mov, true);
+		    stage.removeEventListener(MouseEvent.MOUSE_UP, on_ccc_mouse_up, true);
+		    on_ccc_md();
+		}
+		
+		private function on_ccc_mouse_mov(event:MouseEvent):void
+		{
+		    if (!event.buttonDown)
+		    {
+		        stage.removeEventListener(MouseEvent.MOUSE_MOVE, on_ccc_mouse_mov, true);
+		        stage.removeEventListener(MouseEvent.MOUSE_UP, on_ccc_mouse_up, true);
+		        return;
+		    }
+		    on_ccc_md();
+		}
+
+		private function on_ccb_mouse_down(event:MouseEvent):void
+		{
+		    stage.addEventListener(MouseEvent.MOUSE_MOVE, on_ccb_mouse_mov, true);
+		    stage.addEventListener(MouseEvent.MOUSE_UP, on_ccb_mouse_up, true);
+		    on_ccb_md();
+		}
+		
+		private function on_ccb_mouse_up(event:MouseEvent):void
+		{
+		    stage.removeEventListener(MouseEvent.MOUSE_MOVE, on_ccb_mouse_mov, true);
+		    stage.removeEventListener(MouseEvent.MOUSE_UP, on_ccb_mouse_up, true);
+		    on_ccb_md();
+		}
+		
+		
+		private function on_ccb_mouse_mov(event:MouseEvent):void
+		{
+		    if (!event.buttonDown) {
+		        stage.removeEventListener(MouseEvent.MOUSE_MOVE, on_ccb_mouse_mov, true);
+		        stage.removeEventListener(MouseEvent.MOUSE_UP, on_ccb_mouse_up, true);
+		        return;
+		    }
+		    on_ccb_md();
+		}
+
+		// TIMERS..
+		private var m_timer_count_init:int = 20;
+		private var m_timer_count:int = m_timer_count_init;
+		private var m_timer:Timer = null;
+		
+		private function on_timer_redraw(fn:Function):void
+		{
+		    if (m_timer != null) {
+		        m_timer.stop();
+		        if (--m_timer_count <= 0) { m_timer = null; m_timer_count = m_timer_count_init; fn(new TimerEvent("timer")); return; }
+		    }
+		
+		    m_timer = new Timer(10, 1);
+		    m_timer.addEventListener("timer", fn);
+		    m_timer.start();
+		}
+		
+		
+		private function on_ccc_md_draw():void
+		{
+		    m_timer = null;
+		    if (mode == 0) {
+		        change_rcx1_rgb(color, sel_rgb);
+		    }
+		    else {
+		        change_rcx1_hsb(hsb, sel_hsb);
+		    }    
+		}
+
+
+		private function on_ccc_md():void
+		{
+		    var x:int = int(solidCanvas.mouseX);
+		    var y:int = int(solidCanvas.mouseY);
+
+		    if (x < 0) x = 0;
+		    if (x > 255) x = 255;
+		    if (y < 0) y = 0;
+		    if (y > 255) y = 255;
+
+		    position.x = x;
+		    position.y = 255 - y;
+
+		    if (mode == 0) {
+		        color = position_to_rgb(position, sel_rgb);
+		        hsb = SolidHSB.rgb_to_hsb(color);
+		    }
+		    else {
+		        hsb = position_to_hsb(position, sel_hsb);
+		        color = SolidHSB.hsb_to_rgb(hsb);
+		    }
+		
+		    update_hex_rgb();
+		    set_cc_marker();    
+		    ob_hsb = hsb.to_object();
+		
+		    if (mode == 0) {
+		        change_rcx1_rgb_matrix(color, sel_rgb);
+		    }
+		    else {
+		        on_ccc_md_draw();
+		    }
+		}
+
+		
+		private function on_ccb_md_timer(event:TimerEvent):void
+		{
+		    m_timer = null;
+		    if (mode == 0) {
+		        change_rcx2_rgb_matrix(color, sel_rgb);
+		    }
+		    else {
+		        change_rcx2_hsb(hsb, sel_hsb);
+		    }
+		}
+
+
+		private function on_ccb_md():void
+		{
+		    var x:int = int(solidBar.mouseX);
+		    var y:int = int(solidBar.mouseY);
+
+		    if (x < 0) x = 0;
+		    if (x > 20) x = 20;
+		    if (y < 0) y = 0;
+		    if (y > 255) y = 255;
+		
+		    position.p = 255 - y;
+		
+		    if (mode == 0) {
+		        color = position_to_rgb(position, sel_rgb);
+		        hsb = SolidHSB.rgb_to_hsb(color);
+		    }
+		    else {
+		        hsb = position_to_hsb(position, sel_hsb);
+		        color = SolidHSB.hsb_to_rgb(hsb);
+		    }
+		    update_hex_rgb();
+		    set_cc_marker();    
+		    ob_hsb = hsb.to_object();
+		    if (mode == 0) {
+		        change_rcx2_rgb_matrix(color, sel_rgb);
+		    }
+		    else {
+		        on_timer_redraw(on_ccb_md_timer);
+		    }
+		}
+
+		// MISC
+
+		private function update_hex_rgb():void
+		{
+    		hexrgb.text = zn(color.toString(16).toUpperCase(), 6)
+		}
+
+		private static function zn(s:String, n:uint):String
+		{
+		    var i:int = n - s.length;
+		    while (--i >= 0) s = "0" + s;
+		    return s;
+		}
+
+
+		private function onClickShowNumericPanel():void
+		{
+			if(currentState == "normal")
+			{
+				this.setCurrentState("showColorNumeric");
+			}
+			else if(currentState == "showColorNumeric")
+			{
+				this.setCurrentState("normal");
+			}
+		}
+
+   	]]>
+    </mx:Script>
+
+
+
+	<!-- TOP HORIZONTAL BOX -->
+	<mx:HBox width="100%" height="100%"
+		 backgroundAlpha="1.0"
+		 horizontalAlign="left" verticalAlign="middle"
+		 horizontalGap="0"
+		 paddingLeft="5" paddingTop="0" paddingRight="10">
+
+		<!-- OLD COLOR SWATCH -->
+		<mx:Box id="oldColorSwatch" width="42" height="42"
+		 	borderStyle="none"
+		 	includeInLayout="true" visible="true"/>
+
+		<!-- COLOR SWATCH -->
+		<mx:Box id="colorSwatch" width="21" height="42"
+		 	borderStyle="none"
+		 	includeInLayout="true" visible="true"/>
+
+		<!-- HIDDEN HEX DISPLAY -->
+		<mx:HBox id="hexRgbText" paddingLeft="10" horizontalGap="0"
+			includeInLayout="false" visible="false">
+			<mx:Label text="#" fontWeight="bold"/>
+			<mx:TextInput id="hexrgb" width="55" maxChars="6" text="" change="on_tx_hex_change()" restrict="a-fA-F0-9"/>
+		</mx:HBox>
+
+		<!-- OPACITY CONTROL -->
+		<mx:Label text="Opacity:" paddingLeft="20" />
+		<cloudControls:OpacityControl id="cloudAlpha"
+    		toolTip="Select the opacity from 0% to 100%"
+    		value="{_alpha}"
+    		change="selectedAlpha = event.value;"/>
+
+		<!-- COLOR PICKER -->
+		<mx:HBox width="100%" horizontalAlign="right">
+			<mx:Button id="eyeDropper" width="28" toggle="true"
+				icon="{Globals.g_assets.ColorPickerIcon}"
+				click="onClickColorPicker(event);"/>
+		</mx:HBox>
+	</mx:HBox>
+
+
+
+
+	<!-- SOLID COLOR HORIZONTAL BOX -->
+	<mx:HBox width="100%" height="100%" 
+		horizontalAlign="left" horizontalGap="5" 
+		verticalAlign="middle"
+		paddingLeft="5">
+
+
+		<!-- SHOW NUMERIC PANEL BUTTON -->
+		<mx:Button id="showNumericPanel" click="onClickShowNumericPanel()" width="12" height="150"/>
+
+
+		<!-- NUMERIC COLOR EXTRA PANEL -->
+		<mx:VBox id="numericColorPanel" height="258"
+		 	includeInLayout="false" visible="false"
+		 	paddingTop="0">
+
+			<!-- RGB-HSB BOX -->
+			<mx:VBox height="100%"
+				borderStyle="solid" borderColor="#C0C0C0" cornerRadius="15"
+				horizontalAlign="left" verticalAlign="middle"
+				paddingLeft="2" paddingTop="0" paddingRight="0"
+				verticalGap="0"
+				backgroundAlpha="1.0">
+
+				<!-- RED -->
+				<mx:RadioButton id="rb_r" label="Red" color="red" click="on_rb_rgb_change()" /> 
+				<mx:HBox paddingLeft="20">
+					<mx:NumericStepper id="tx_r" maxChars="3" minimum="0" maximum="255" stepSize="1" width="55"
+						value="{(_color >> 16) &amp; 0xFF}" 
+						change="on_tx_rgb_change()"
+						dataChange="on_tx_rgb_change()" />
+				</mx:HBox>
+
+				<!-- GREEN -->
+				<mx:RadioButton id="rb_g" label="Green" color="green" click="on_rb_rgb_change()" />
+				<mx:HBox paddingLeft="20">
+					<mx:NumericStepper id="tx_g" maxChars="3" minimum="0" maximum="255" stepSize="1" width="55"
+						value="{(_color >> 8) &amp; 0xFF}" 
+						change="on_tx_rgb_change()" 
+						dataChange="on_tx_rgb_change()" />
+				</mx:HBox>
+
+				<!-- BLUE -->
+				<mx:RadioButton id="rb_b" label="Blue:" color="blue" click="on_rb_rgb_change()" />
+				<mx:HBox paddingLeft="20">
+					<mx:NumericStepper id="tx_b" maxChars="3" minimum="0" maximum="255" stepSize="1" width="55"
+						value="{(_color) &amp; 0xFF}" 
+						change="on_tx_rgb_change()" 
+						dataChange="on_tx_rgb_change()" />
+				</mx:HBox>
+
+				<!-- HUE -->
+				<mx:RadioButton id="rb_H" label="Hue (В°)" click="on_rb_hsb_change()" />
+				<mx:HBox paddingLeft="20">
+					<mx:NumericStepper id="tx_H" maxChars="3" minimum="0" maximum="359" stepSize="1" width="55"
+						value="{ob_hsb.h}" change="on_tx_hsb_change()" />
+				</mx:HBox>
+
+				<!-- SATURATION -->
+				<mx:RadioButton id="rb_S" label="Satur (%)" click="on_rb_hsb_change()" />
+				<mx:HBox paddingLeft="20">
+					<mx:NumericStepper id="tx_S" maxChars="3" minimum="0" maximum="100" stepSize="1" width="55"
+						value="{ob_hsb.s}" 
+						change="on_tx_hsb_change()" />
+				</mx:HBox>
+
+				<!-- BRIGHTNESS -->
+				<mx:RadioButton id="rb_B" label="Bright (%)" click="on_rb_hsb_change()" />
+				<mx:HBox paddingLeft="20">
+					<mx:NumericStepper id="tx_B" maxChars="3" minimum="0" maximum="100" stepSize="1" width="55"
+						value="{ob_hsb.b}" 
+						change="on_tx_hsb_change()" />
+				</mx:HBox>
+
+			</mx:VBox>
+
+		</mx:VBox> 
+
+
+		<!-- COLOR CANVAS -->
+		<mx:Canvas width="258" height="258" horizontalScrollPolicy="off" verticalScrollPolicy="off" 
+			 borderStyle="solid" borderColor="0x000000">
+			<colorClasses:SolidCanvas id="solidCanvas" x="0" y="0" width="256" height="256" minWidth="256" maxWidth="256" minHeight="256" maxHeight="256" 
+				mouseDown="on_ccc_mouse_down(event);"/>
+			<mx:SWFLoader id="ccm" source="{cc_marker}" x="0" y="0" />
+		</mx:Canvas>
+
+
+		<!-- VERTICAL BAR -->
+		<mx:Canvas x="0" y="-5" width="42" height="275">
+			<mx:SWFLoader id="ccrm" source="{cc_r_marker}" x="5" y="0" width="5" height="9" scaleContent="false" />
+			<mx:Canvas x="6" y="8" width="24" height="258" horizontalScrollPolicy="off" verticalScrollPolicy="off" 
+				 borderStyle="solid" borderColor="0x000000">
+				<colorClasses:SolidCanvas id="solidBar" x="0" width="24" height="256" minWidth="24" maxWidth="24" minHeight="256" maxHeight="256" 
+					mouseDown="on_ccb_mouse_down(event);"/>
+			</mx:Canvas>
+			<mx:SWFLoader id="cclm" source="{cc_l_marker}" x="24" y="0" width="5" height="9" scaleContent="false" />
+		</mx:Canvas>
+
+	</mx:HBox>
+
+
+	<mx:SWFLoader id="osi_view" includeInLayout="false" visible="false" />
+
+
+
+	<mx:states>
+		<mx:State name="normal">
+		</mx:State>
+
+		<mx:State name="showColorNumeric">
+			<mx:SetProperty target="{this.parentDocument}" name="width" value="{this.parentDocument.width + numericColorPanel.width + 15}" />
+			<mx:SetProperty target="{numericColorPanel}" name="includeInLayout" value="true" />
+			<mx:SetProperty target="{numericColorPanel}" name="visible" value="true" />
+			<mx:SetProperty target="{hexRgbText}" name="includeInLayout" value="true" />
+			<mx:SetProperty target="{hexRgbText}" name="visible" value="true" />
+		</mx:State>
+	</mx:states>
+
+
+	<mx:transitions>
+		<mx:Transition fromState="normal" toState="showColorNumeric">
+		</mx:Transition>
+
+		<mx:Transition fromState="showColorNumeric" toState="normal">
+		</mx:Transition>
+	</mx:transitions>
+
+
+</mx:VBox>

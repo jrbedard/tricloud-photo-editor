@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml" 
+	horizontalAlign="center" verticalAlign="middle"
+	paddingLeft="10" paddingTop="10" paddingRight="10" paddingBottom="10">
+
+
+	<mx:Script>
+    <![CDATA[
+
+		import controls.brushClasses.CloudBrush;
+
+
+		[Bindable]
+		private var brush:CloudBrush = null;
+
+		[Bindable]
+		private var brushXML:XML = null;
+
+
+		// Init
+		public function init(brush:CloudBrush):void
+		{
+			this.brush = brush;
+
+			brushXML = this.brush.Save();
+		}
+
+
+	]]>
+    </mx:Script>
+
+	<mx:Image id="brushIcon" source="{brush.iconBitmap}"
+		maintainAspectRatio="true"
+		horizontalAlign="center" verticalAlign="middle"/>
+
+</mx:VBox>

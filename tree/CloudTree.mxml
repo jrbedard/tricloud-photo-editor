@@ -1,0 +1,666 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Tree xmlns:mx="http://www.adobe.com/2006/mxml"
+	borderStyle="solid" borderColor="0xc0c0ee" borderSides="top left right" borderThickness="1"
+	paddingBottom="0"
+	dropShadowEnabled="false"
+	horizontalScrollPolicy="auto" verticalScrollPolicy="auto"
+	allowMultipleSelection="false"
+	alternatingItemColors="[0xffffff, 0xf7f7f7]"
+	showRoot="false"
+	useRollOver="false"
+
+ 	dataProvider="{canvas.cloudsXML}"
+ 	itemRenderer="tree.CloudTreeItem"
+	labelField="@name"
+	rowHeight="54"
+
+	editable="false"
+ 	itemEditor="tree.CloudTreeEditor"
+ 	editorDataField="name"
+ 	editorUsesEnterKey="true"
+ 	editorXOffset="53" editorYOffset="5"
+ 	editorWidthOffset="-90" editorHeightOffset="-25"
+ 	itemEditBegin="onItemEditBegin(event)"
+ 	itemEditEnd="onItemEditEnd(event)"
+
+	allowDragSelection="true"
+	dragEnabled="true" dropEnabled="true" dragMoveEnabled="true"
+    dropIndicatorSkin="tree.CloudTreeDropIndicator"
+
+	creationComplete="onCreationComplete()"
+	change="onChangeTree(event)"
+	itemOpen="onOpenTreeItem(event)"
+ 	itemClose="onCloseTreeItem(event)"
+ 	itemClick="onClickTreeItem(event)"
+ 	doubleClickEnabled="false"
+ 	itemDoubleClick="onDoubleClickTreeItem(event)"
+>
+
+
+
+	<mx:Script>
+    <![CDATA[
+		import flash.geom.Point;
+    	import mx.containers.Panel;
+    	import mx.events.TreeEvent;
+    	import mx.events.ListEvent;
+    	import mx.events.DragEvent;
+    	import mx.events.MenuEvent;
+    	import mx.events.CloseEvent;
+    	import mx.managers.DragManager;
+		import mx.managers.PopUpManager;
+		import mx.controls.listClasses.IListItemRenderer;
+		import mx.controls.Button;
+		import mx.controls.Alert;
+		import mx.controls.Menu;
+		import mx.collections.XMLListCollection;
+
+ 		import core.Cloud;
+ 		import core.CanvasCloud;
+		import core.CloudController;
+		import core.CanvasController;
+		import share.ShareController;
+		import events.*;
+		import CloudEngine;
+
+
+		[Bindable]
+		private var canvas:CanvasCloud = null;
+
+		[Bindable]
+		private var shareController:ShareController = null;
+
+
+		private var cloudMenu:Menu = null;
+
+
+		private var dragSel:XML = null; // XML Cloud being Dragged
+
+
+
+
+		private function onCreationComplete():void
+		{
+			// On click on a cloud button on a tree item
+			this.addEventListener('cloudClick', onClickCloudMenuButton);
+			this.addEventListener('cloudNameEditEnd', onCloudNameEditEnd);
+
+			// Create Cloud PopupMenu, appearing speed optimized by being created here
+			cloudMenu = Menu.createMenu(this, cloudMenuData,  false);
+			//cloudMenu.iconField = "@icon"; // doesnt work, use iconFunction instead
+			cloudMenu.iconFunction = cloudMenuIconFunction;
+			cloudMenu.labelField = "@label";
+			cloudMenu.styleName = "CloudMenu";
+			cloudMenu.addEventListener("itemClick", onClickItemCloudMenu);
+
+			// Set the Right Click menu for this menu
+			var rightClickMenu:RightClickMenu = new RightClickMenu("TriCloud");
+   			cloudMenu.contextMenu = rightClickMenu.triCloudContextMenu;
+		}
+
+
+		public function init():void
+		{
+			// Retreive canvas
+			var canvasController:CanvasController = CloudEngine.GetInstance().GetCanvasController();
+			canvas = canvasController.GetCanvas();
+			//canvas.addEventListener("canvasUpdate", onCanvasUpdate);
+
+			var cloudController:CloudController = CloudEngine.GetInstance().GetCloudController();
+			cloudController.addEventListener("selectCloud", onChangeSelectedCloud);
+
+			shareController = CloudEngine.GetInstance().GetShareController();
+
+			// Select the first cloud
+			this.selectedIndex = 0;
+		}
+
+
+
+
+		// The selected cloud changed on the canvas, select it in the tree..
+		private function onChangeSelectedCloud(cloudEvent:CloudEvent):void
+		{
+			if(cloudEvent.m_cloud)
+			{
+				this.SelectCloud(cloudEvent.m_cloud.localID);
+			}
+		}
+
+
+		// MY CLOUDS BUTTONS
+
+
+		// click ADD NEW cloud
+		public function NewCloud(cloudType:String, cloudName:String = null, bitmapData:BitmapData = null, 
+			resizeCanvas:Boolean = false):void
+		{
+			// Add a new cloud on active Canvas
+			canvas.AddNewCloud(cloudName, cloudType, bitmapData, resizeCanvas);
+
+		}
+
+
+		// Validata Cloud Action
+		private function ValidateCloud(action:String):XML
+		{
+			var selXML:XML = this.selectedItem as XML;
+			if(!selXML)
+			{
+				CloudAlert.show("Cannot "+ action +" Cloud, no Cloud is selected", action + " Cloud");
+				return null;
+			}
+
+			if(selXML.localName() == "cloud") // a cloud is selected
+			{
+				return selXML;
+			}
+			return null;
+		}
+
+
+
+		// find and select cloud in the tree (called when a cloud is clicked on the canvas)
+		public function SelectCloud(cloudID:uint):void
+		{
+			// Find cloud
+			var resXML:XMLList = canvas.cloudsXML.source.(@localID == cloudID); // find cloud with the same local ID
+			if(resXML.length() > 0)
+			{
+				this.selectedItem = resXML[0]; // select the first cloud with matching name
+			}
+			else
+			{
+				trace("The Cloud '" + cloudID + "' was not found in the tree");
+			}
+		}
+
+
+
+		public function RenameSelCloud():void
+		{
+			var selXML:XML = ValidateCloud('Rename');
+			if(!selXML) // a cloud is selected
+				return;
+
+			// Start editing, shit!
+			this.editable = true;
+			var obj:Object = {rowIndex: this.selectedIndex};
+			this.editedItemPosition = obj;
+			this.createItemEditor(this.indexToColumn(0), this.indexToRow(this.selectedIndex));
+		}
+
+
+
+		// click DUPLICATE Cloud
+		public function DuplicateSelCloud():void
+		{
+			var selXML:XML = ValidateCloud('Duplicate');
+			if(!selXML) // a cloud is selected
+				return;
+
+			// Duplicate cloud on active Canvas
+			var newCloudXML:XML = canvas.DuplicateCloud(selXML);
+
+			// Select the new Cloud
+			this.selectedItem = newCloudXML;
+		}
+
+
+		// click DELETE Cloud
+		public function DeleteSelCloud():void
+		{
+			var selXML:XML = ValidateCloud('Delete');
+			if(!selXML)
+				return;
+
+			// Do you want to delete the Cloud?
+        	var alert:Alert = Alert.show("Are sure you want to delete cloud '" + selXML.@name + "' ?", "Delete Cloud", 3, 
+        		this, alertClickHandlerDelete);
+
+			alert.titleIcon = Globals.g_assets.DeleteCloudIcon;
+		}
+
+		// Asked to delete Cloud
+        private function alertClickHandlerDelete(event:CloseEvent):void 
+        {
+			if(event.detail==Alert.YES)
+            {
+            	doDeleteSelCloud();
+            }
+            else
+            {
+            	return;
+            }
+        }
+
+		// Asked to delete Cloud
+        private function doDeleteSelCloud():void 
+        {
+			var selXML:XML = ValidateCloud('Delete');
+			if(!selXML)
+				return;
+
+			// Remove Cloud from XML
+        	var index:int = canvas.cloudsXML.getItemIndex(selXML); // find the selected item
+			canvas.cloudsXML.removeItemAt(index); // remove the item
+
+			// Delete cloud on active Canvas
+			canvas.RemoveCloudByID(selXML.@localID);
+
+			// Select the cloud above the deleted cloud (if existing, if not, the one below)
+			if(index-1 >= 0) // if theres a cloud above this one
+			{
+				this.selectedItem = canvas.cloudsXML.getItemAt(index-1); // select the cloud above 
+			}
+			else // no cloud above, select below
+			{
+				if(index < canvas.cloudsXML.length) // if whitin bound
+				{
+					this.selectedItem = canvas.cloudsXML.getItemAt(index);
+				}
+				else // no cloud left: unselect;
+				{
+					canvas.UnSelectCloud();
+				}
+			}
+		}
+
+
+		// click MERGE Cloud with cloud below
+		public function MergeSelCloud():void
+		{
+			var selXML:XML = ValidateCloud('Merge');
+			if(!selXML)
+				return;
+
+			var index:int = canvas.cloudsXML.getItemIndex(selXML); // find the selected item
+
+			if(index < canvas.cloudsXML.length-1) // merge down
+			{
+				var otherXML:XML = canvas.cloudsXML.getItemAt(index+1) as XML;	
+				if(otherXML)
+				{
+					var succ:Boolean = canvas.MergeClouds(selXML.@name, otherXML.@name);			
+					if(succ)
+					{
+						doDeleteSelCloud(); // Delete selected Cloud...
+					}
+				}
+				else
+				{
+					CloudAlert.show("Invalid target cloud", "Merge Clouds");
+				}
+			}
+			else
+			{
+				CloudAlert.show("Cannot Merge", "Merge Clouds");
+			}
+		}
+
+
+		// click LINK Clouds
+		public function LinkSelCloud():void
+		{
+			var selXML:XML = ValidateCloud('Link');
+			if(!selXML)
+				return;
+
+			
+		}
+
+
+
+		// Move UP or Down selected Cloud
+		public function MoveSelCloud(moveUp:Boolean):void
+		{
+			var selXML:XML = ValidateCloud('Move');
+			if(!selXML)
+				return;
+
+
+			var index:int = canvas.cloudsXML.getItemIndex(selXML); // find the selected item
+
+			if(moveUp) // Move the cloud UP one slot, decrease the index (ZOrder)
+			{
+				if(index-1 >= 0)  // move up, below top
+				{
+					var tempXML:XML = canvas.cloudsXML.getItemAt(index-1) as XML;
+					canvas.cloudsXML.setItemAt(selXML, index-1);
+					canvas.cloudsXML.setItemAt(tempXML, index); //  Swap place with cloud above
+					this.selectedItem = selXML; // Select the cloud that was moved up
+
+					canvas.ReOrderClouds(); // Update Order on Canvas
+				}
+				else
+				{
+					//CloudAlert.show("Cloud already at the top");
+					// TODO: Note and Shake!
+				}
+			}
+			else // Move the cloud DOWN one slot, increase the index (ZOrder)
+			{
+				if(index < canvas.cloudsXML.length-1) // move down
+				{
+					var tempXML2:XML = canvas.cloudsXML.getItemAt(index+1) as XML;
+					canvas.cloudsXML.setItemAt(selXML, index+1);
+					canvas.cloudsXML.setItemAt(tempXML2, index); // Swap place with cloud below
+					this.selectedItem = selXML; // Select the cloud that was moved down
+
+					canvas.ReOrderClouds(); // Update Order on canvas
+				}
+				else
+				{
+					//CloudAlert.show("Cannot move the Cloud below the canvas");
+					// TODO: Note and Shake!
+				}
+			}
+		}
+
+
+		//  SUBMIT selected Cloud
+		private function SubmitSelCloud():void
+		{
+		    var selXML:XML = ValidateCloud('Submit');
+			if(!selXML)
+				return;
+
+			// Get derived cloud (image, text or draw)
+			var sCloud:Cloud = canvas.FindCloud(selXML.@localID);
+			if(!sCloud)
+			{
+				trace('cannot find cloud, weird');
+				return;
+			}
+
+			// Share Cloud
+			shareController.ShareImageCloud(sCloud);
+		}
+
+
+
+
+		// TREE EVENTS
+
+
+        // Event handler for the Tree control change event.
+        private function onChangeTree(event:Event):void 
+        {
+          	// Set the right cloud in the CloudController:
+        }
+
+		// Opened a cloud
+		private function onOpenTreeItem(event:TreeEvent):void
+		{
+			
+		}
+
+		// Closed a cloud
+		private function onCloseTreeItem(event:TreeEvent):void
+		{
+			
+		}
+
+
+		// EDIT ITEM events
+		// ---------------------------------------------------
+
+		// Begin edit item 
+		private function onItemEditBegin(event:ListEvent):void
+		{
+			// see CloudTreeEditor
+		}
+
+		// Pressed enter in the editor
+		private function onCloudNameEditEnd(event:Event):void
+		{
+			this.endEdit('enter');
+			//this.selectItem(this.editedItemRenderer, false, false, false);
+		}
+
+		// End edit item : WHY is it called 2 times???
+		private function onItemEditEnd(event:ListEvent):void
+		{
+			// TODO: validate that there is no cloud with the same name in the tree
+
+			if(event.itemRenderer && event.itemRenderer.data)
+			{
+				// called twice, second time: no effect... old and new are the same
+				canvas.RenameCloud(event.itemRenderer.data.@localID, event.itemRenderer.data.@name, 
+					this.itemEditorInstance.name);
+			}
+
+			this.editable = false; // make the tree non-editable
+		}
+
+
+
+		// DRAG & DROP events
+		// ---------------------------------------------------
+
+		// Start dragging tree item
+		protected override function dragEnterHandler(event:DragEvent):void
+		{
+
+			dragMoveEnabled = true; // by default, 'move' when dragging categories and tags over the tree. 
+									// It is converted to 'copy' when dragging over the shirtPanel
+			var selXML:XML = ValidateCloud('Drag');
+			if(!selXML)
+				return;
+
+			dragSel = selXML;
+
+			CloudCursor.SetCursor(CloudCursor.NO_CURSOR); // Reset Cursor to see DragDrop feedback
+
+			canvas.SelectCloudByID(selXML.@localID);
+
+			super.dragEnterHandler(event);
+		}
+
+
+		// Dragging over
+		protected override function dragOverHandler(event:DragEvent):void
+		{
+			super.dragOverHandler(event);
+
+		}
+
+
+		// Dropping tree item
+		protected override function dragDropHandler(event:DragEvent):void
+		{
+			dragMoveEnabled = true; // force move whitin the tree
+
+			super.dragDropHandler(event);
+
+			// Change the cloud order on canvas according to order in the tree.
+			canvas.ReOrderClouds();
+		}
+
+
+		protected override function dragCompleteHandler(event:DragEvent):void
+		{
+			super.dragCompleteHandler(event);
+
+			// flag.
+			if(dragSel)
+			{
+				this.selectedItem = dragSel;
+			}
+
+			dragSel = null;
+		}
+
+
+		
+		// RENDERER
+        // ***********************************
+        override protected function updateDisplayList(unscaledWidth:Number, unscaledHeight:Number):void
+        {
+            super.updateDisplayList(unscaledWidth, unscaledHeight);
+        }
+
+
+
+		// CLICK events
+		// --------------------------------------------
+
+		// Click cloud
+		private function onClickTreeItem(listEvent:ListEvent):void
+		{
+			var selXML:XML = ValidateCloud('Select');
+			if(!selXML)
+				return;
+
+			canvas.SelectCloudByID(selXML.@localID);
+		}
+
+
+		// Double Click cloud or tag
+		private function onDoubleClickTreeItem(listEvent:ListEvent):void
+		{
+			var selXML:XML = ValidateCloud('Select');
+			if(!selXML)
+				return;
+
+			//this.editable = true; // make the tree editable to edit the current cloud?
+		}
+
+
+		// CLOUD MENU
+		// --------------------------------------------
+
+		private function cloudMenuIconFunction(item:Object):Class
+		{
+			var itemName:String = item.@name;
+
+			switch(itemName)
+			{
+				case "rename":
+					return Globals.g_assets.NewDrawCloudIcon;
+					break;
+				case "duplicate":
+					return Globals.g_assets.DuplicateCloudIcon;
+					break;
+				case "delete":
+					return Globals.g_assets.DeleteCloudIcon;
+					break;
+				case "merge":
+					return Globals.g_assets.MergeCloudIcon;
+					break;
+				case "link":
+					return Globals.g_assets.NewDrawCloudIcon;
+					break;
+				case "submit":
+					return Globals.g_assets.ShareIcon;
+					break;
+			}
+			return null;
+		}
+
+
+		// Clicked the Cloud Button on a tree item
+		public function onClickCloudMenuButton(event:CloudTreeItemEvent):void
+		{
+			var selXML:XML = ValidateCloud('Select');
+			if(!selXML)
+				return;
+
+			if(selXML.@name != event.m_cloud.name)
+			{
+				return;
+			}
+
+
+			// test
+            if(cloudMenu.indexToItemRenderer(2))
+            {
+            	cloudMenu.indexToItemRenderer(2).enabled = false;
+            	cloudMenu.indexToItemRenderer(2).alpha = 0.25;
+            }
+
+            cloudMenu.show(event.m_mousePos.x, event.m_mousePos.y); // Show Cloud menu
+		}
+
+
+		// Event handler for the Menu control's click event.
+        private function onClickItemCloudMenu(event:MenuEvent):void
+        {
+			if(event.item.@name == "rename")
+            {
+            	RenameSelCloud();
+            }
+			if(event.item.@name == "duplicate")
+            {
+            	DuplicateSelCloud();
+            }
+            else if(event.item.@name == "delete")
+            {
+            	DeleteSelCloud();
+            }
+            else if(event.item.@name == "merge")
+            {
+            	MergeSelCloud();
+            }
+			else if(event.item.@name == "link")
+            {
+            	LinkSelCloud();
+            }
+            else if(event.item.@name == "submit")
+            {
+            	SubmitSelCloud();
+            }
+            //Alert.show("Label: " + event.item.@label, "Clicked menu item");
+        }
+
+ 
+ 
+ 		// CANVAS MENU
+ 
+ 		private function canvasMenuIconFunction(item:Object):Class
+		{
+			return Globals.g_assets.NewDrawCloudIcon;
+		}
+
+
+ 		private function onClickItemCanvasMenu(event:MenuEvent):void
+        {
+        	
+        }
+ 
+ 
+ 
+		// KEYBOARD Handler
+		protected override function keyDownHandler(event:KeyboardEvent):void
+		{
+			//super.keyDownHandler(event);
+
+			if(event.keyCode == 40) // DOWN ARROW
+			{
+				
+			}
+		}
+ 
+ 		// KEYBOARD Handler
+		protected override function keyUpHandler(event:KeyboardEvent):void
+		{
+			//super.keyUpHandler(event);
+		}
+ 
+ 	]]>
+    </mx:Script>
+
+
+	<mx:XML id="cloudMenuData">
+    <root>
+    	<menuitem name="rename" label="Rename Cloud"/>
+        <menuitem name="duplicate" label="Duplicate Cloud"/>
+        <menuitem name="delete" label="Delete Cloud"/>
+        <menuitem name="merge" label="Merge with Cloud below"/>
+        <menuitem name="link" label="Link with Cloud below"/>
+        <menuitem type="separator"/>
+        <menuitem name="submit" label="Submit Cloud to library"/>
+    </root>
+    </mx:XML>
+
+</mx:Tree>

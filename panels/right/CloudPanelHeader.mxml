@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:cloudControls="controls.*"
+	horizontalScrollPolicy="off" verticalScrollPolicy="off"
+	mouseEnabled="false"
+
+	borderStyle="none"
+	paddingTop="0" paddingLeft="0" paddingBottom="0" paddingRight="0"
+
+	creationComplete="onCreationComplete()" >
+
+
+	<mx:Script>
+    <![CDATA[
+    	import mx.containers.ViewStack;
+
+		import core.Cloud;
+
+
+		[Bindable]
+		private var m_cloud:Cloud = null; // For Cloud Panel
+
+		[Bindable]
+		private var metaCloudXML:XML = null; // For MetaCloud Panel
+
+
+
+		[Bindable]
+		private var cloudIconBitmap:Bitmap = new Bitmap();
+
+		[Bindable]
+		private var cloudType:String = "";
+
+
+		private function onCreationComplete():void
+		{
+			
+		}
+
+		// Changed the selected cloud in the cloud tree or canvas
+		public function SetCloud(sCloud:Cloud):void
+		{
+			m_cloud = sCloud;
+
+			// Must be copied here, else it clashes with CloudTreeItem
+			cloudIconBitmap.bitmapData = m_cloud.iconBitmap.bitmapData;
+			//cloudIconBitmap.smoothing = true; // slower...
+
+			cloudType = m_cloud.type;
+		}
+
+		// Set the Meta Cloud, selected in the cloudLibrary
+		public function SetMetaCloud(metaCloud:XML, iconBitmap:Bitmap):void
+		{
+			metaCloudXML = metaCloud;
+
+			//cloudIconImage.source = metaCloud.@iconPath;
+			cloudIconBitmap.bitmapData = iconBitmap.bitmapData;
+
+			cloudType = metaCloudXML.@type;
+		}
+
+
+		// Click Cloud Image (only when in Cloud Library)
+		private function onClickCloudImage():void
+		{
+			if(metaCloudXML)
+			{
+				navigateToURL(new URLRequest('/cloud/index/' + metaCloudXML.@id), 'TriCloud');
+			}
+		}
+
+
+        // RENDERER
+        // ***********************************
+        override protected function updateDisplayList(unscaledWidth:Number, unscaledHeight:Number):void
+        {
+            super.updateDisplayList(unscaledWidth, unscaledHeight);
+        }
+
+    ]]>
+    </mx:Script>
+
+
+	<mx:Image id="cloudIconImage" width="48" height="48" 
+		maintainAspectRatio="true" scaleContent="true"
+		x="5" y="5"
+		source="{cloudIconBitmap}"
+		mouseEnabled="false"
+		buttonMode="false"
+		click="onClickCloudImage()"/>
+
+	<mx:Label id="cloudTypeLabel" x="56" y="30" 
+		text="{cloudType}" fontStyle="italic" 
+		mouseEnabled="false"/>
+
+
+	<mx:states>
+		<mx:State name="cloudDesign">
+			<mx:SetProperty target="{cloudIconImage}" name="mouseEnabled" value="false" />
+			<mx:SetProperty target="{cloudIconImage}" name="buttonMode" value="false" />
+		</mx:State>
+
+		<mx:State name="cloudLibrary">
+			<mx:SetProperty target="{cloudIconImage}" name="mouseEnabled" value="true" />
+			<mx:SetProperty target="{cloudIconImage}" name="buttonMode" value="true" />
+		</mx:State>
+	</mx:states>
+
+</mx:Canvas>

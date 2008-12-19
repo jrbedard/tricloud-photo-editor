@@ -1,0 +1,679 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:HBox xmlns:mx="http://www.adobe.com/2006/mxml"
+	horizontalScrollPolicy="off" verticalScrollPolicy="off"
+
+	backgroundColor="0xDDDDDD" backgroundAlpha="0.5"
+	horizontalAlign="center" verticalAlign="bottom"
+	paddingLeft="15" paddingRight="15" paddingBottom="0" verticalGap="0"
+	borderStyle="solid" borderColor="0xAAAAAA" borderSides="bottom, left, right" cornerRadius="20"
+
+	creationComplete="onCreationComplete()"
+	resize="onResize()">
+
+
+  	<mx:Script>
+    <![CDATA[
+    	
+ 		import mx.controls.Alert;
+        import mx.events.CloseEvent;
+        import mx.events.ItemClickEvent;
+        import mx.events.MenuEvent;
+        import mx.managers.PopUpManager;
+        import mx.collections.XMLListCollection;
+        import mx.controls.Menu;
+
+		import core.Cloud;
+		import core.CanvasCloud;
+		import session.SessionController;
+		import session.LoginDialog;
+		import image.ExportDialog;
+		import image.ImportDialog;
+		import dialogs.EmailDialog;
+		import dialogs.PrintDialog;
+		import dialogs.ImageDialog;
+		import share.ShareController;
+		import help.*;
+		import CloudEngine;
+
+
+		[Bindable]
+		private var canvas:CanvasCloud = null;
+
+
+		[Bindable]
+		private var sessionController:SessionController = null;
+
+		[Bindable]
+		private var shareController:ShareController = null;
+
+
+
+		// Modal Image preview dialog
+		private const imagePreviewDialog:ImageDialog = ImageDialog.imagePreviewDialog;
+
+		// Modal Image importer dialog
+		private const imageImportDialog:ImportDialog = ImportDialog.imageImportDialog;
+
+		// Modal Image exporter dialog
+		private const imageExportDialog:ExportDialog = ExportDialog.imageExportDialog;
+
+		// Modal Image Email
+		private const emailDialog:EmailDialog = EmailDialog.emailDialog;
+
+		// Modal Image Print
+		private const printDialog:PrintDialog = PrintDialog.printDialog;
+
+
+		// User Login
+		private const loginDialog:LoginDialog = LoginDialog.loginDialog;
+
+
+
+		// Help
+		private const helpDialog:HelpDialog = HelpDialog.helpDialog;
+
+		// Bugs
+		private const contactDialog:ContactDialog = ContactDialog.contactDialog;
+
+		// About TriCloud
+		private const aboutDialog:AboutDialog = AboutDialog.aboutDialog;
+
+
+
+		private var sessionMenu:Menu = null;
+		private var imageMenu:Menu = null;
+		private var cloudMenu:Menu = null;
+		private var helpMenu:Menu = null;
+
+
+		private var undoPos:Point = null; // for HistoryManager position
+
+
+
+
+
+		private function onCreationComplete():void
+		{
+			sessionController = CloudEngine.GetInstance().GetSessionController();
+			shareController = CloudEngine.GetInstance().GetShareController();
+
+			CreateAppMenu();
+		}
+
+
+		private function CreateAppMenu():void
+		{
+			sessionMenu = Menu.createMenu(this, sessionMenuData,  false);
+			sessionMenu.iconFunction = appMenuIconFunction;
+			sessionMenu.iconField = "@icon"
+			sessionMenu.labelField = "@label";
+			sessionMenu.styleName = "CloudMenu";
+			sessionMenu.addEventListener("itemClick", onItemClickSubMenu);
+
+			imageMenu = Menu.createMenu(this, imageMenuData,  false);
+			imageMenu.iconFunction = appMenuIconFunction;
+			imageMenu.labelField = "@label";
+			imageMenu.styleName = "CloudMenu";
+			imageMenu.addEventListener("itemClick", onItemClickSubMenu);	
+
+			cloudMenu = Menu.createMenu(this, cloudMenuData,  false);
+			cloudMenu.iconFunction = appMenuIconFunction;
+			cloudMenu.labelField = "@label";
+			cloudMenu.styleName = "CloudMenu";
+			cloudMenu.addEventListener("itemClick", onItemClickSubMenu);
+
+			helpMenu = Menu.createMenu(this, helpMenuData,  false);
+			helpMenu.iconFunction = appMenuIconFunction;
+			helpMenu.labelField = "@label";
+			helpMenu.styleName = "CloudMenu";
+			helpMenu.addEventListener("itemClick", onItemClickSubMenu);
+
+			// Set the Right Click menu for the Menu
+			var rightClickMenu:RightClickMenu = new RightClickMenu("TriCloud");
+   			sessionMenu.contextMenu = rightClickMenu.triCloudContextMenu;
+   			imageMenu.contextMenu = rightClickMenu.triCloudContextMenu;
+   			cloudMenu.contextMenu = rightClickMenu.triCloudContextMenu;
+   			helpMenu.contextMenu = rightClickMenu.triCloudContextMenu;
+		}
+
+
+
+		public function init(canvas:CanvasCloud):void
+		{
+			this.canvas = canvas;
+
+			sessionController.SetCanvas(canvas);
+
+			// Compute HistoryDialog position
+			undoPos = new Point(undoButtons.x, undoButtons.y);
+			undoPos = this.localToGlobal(undoPos);
+			undoPos.x += undoButtons.width;
+			undoPos.y += undoButtons.height;
+
+			// DEBUG: show HistoryDialog at startup
+			if(Globals.g_debug)
+			{
+				sessionController.onClickHistoryManager(undoPos.x, undoPos.y);
+			}
+		}
+
+		
+
+		private function onResize():void
+		{
+			
+		}
+
+		private function appMenuIconFunction(item:Object):Class
+		{
+			var itemName:String = item.@name;
+
+			switch(itemName)
+			{
+				// SESSION Menu
+				case "login":
+					return Globals.g_assets.NewDrawCloudIcon;
+					break;
+				case "new":
+					return Globals.g_assets.DuplicateCloudIcon;
+					break;
+				case "load":
+					return Globals.g_assets.DeleteCloudIcon;
+					break;
+				case "save":
+					return Globals.g_assets.MergeCloudIcon;
+					break;
+				case "history":
+					return Globals.g_assets.NewDrawCloudIcon;
+					break;
+
+
+				// IMAGE Menu
+				case "preview":
+					return Globals.g_assets.ImagePreview;
+					break;
+				case "import":
+					break;
+				case "export":
+					break;
+				case "email":
+					return Globals.g_assets.EmailIcon;
+					break;
+				case "print":
+					return Globals.g_assets.PrintIcon;
+					break;
+
+
+				// CLOUD Menu
+				case "browse":
+					return Globals.g_assets.TriCloudIcon16;
+					break;
+				case "submit":
+					return Globals.g_assets.ShareIcon;
+					break;
+				case "share":
+					return Globals.g_assets.ShareIcon;
+					break;
+				case "shareImage":
+					return CloudType.Icon(CloudType.ST_IMAGE);
+					break;
+				case "shareFont":
+					return CloudType.Icon(CloudType.ST_FONT);
+					break;
+				case "shareBrush":
+					return CloudType.Icon(CloudType.ST_BRUSH);
+					break;
+				case "shareShape":
+					return CloudType.Icon(CloudType.ST_SHAPE);
+					break;
+				case "shareGradient":
+					return CloudType.Icon(CloudType.ST_GRADIENT);
+					break;
+				case "shareEffect":
+					return CloudType.Icon(CloudType.ST_EFFECT);
+					break;
+
+
+				// HELP Menu
+				case "online":
+					return Globals.g_assets.HelpIcon;
+					break;
+				case "about":
+					return Globals.g_assets.TriCloudIcon16;
+					break;
+				
+
+			}
+			return null;
+		}
+
+
+		private function onItemClickAppMenu(event:ItemClickEvent):void
+		{
+			var itemName:String = event.item.name;
+
+			var pos:Point = new Point(event.relatedObject.x, event.relatedObject.y);
+			pos = event.currentTarget.localToGlobal(pos);
+			pos.x -= event.relatedObject.width/2;
+			pos.y += event.currentTarget.height;
+			pos.y -= 1;
+
+			switch(itemName)
+			{
+				case 'session': // session
+					onClickSession();
+					sessionMenu.show(pos.x + 15, pos.y); // Show Session menu
+				break;
+
+				case 'image': // image
+					imageMenu.show(pos.x + 3, pos.y); // Show image menu
+				break;
+
+				case 'cloud': // cloud
+					cloudMenu.show(pos.x - 15, pos.y); // Show Cloud menu
+				break;
+
+				case 'help': // help
+					helpMenu.show(pos.x - 15, pos.y); // Show Help menu
+				break;
+			}
+		}
+
+
+		private function onItemClickSubMenu(event:MenuEvent):void
+		{
+			var itemName:String = event.item.@name;
+
+			switch(itemName)
+			{
+				// SESSION SUB-MENU
+				case 'login': // Login
+					onClickLogin();
+				break;
+
+				case 'new': // new Session
+					sessionController.NewSession();
+				break;
+
+				case 'load': // load Session
+					sessionController.LoadSession();
+				break;
+
+				case 'save': // save Session
+					sessionController.SaveSession();
+				break;
+
+				case 'history': // Session History
+					sessionController.onClickHistoryManager(undoPos.x, undoPos.y);
+				break;
+
+				case 'settings': // Session Settings
+					sessionController.onClickSettings();
+				break;
+
+				case 'myPortfolio': // My Portfolio
+					onClickMyPortfolio();
+				break;
+
+				case 'exit': // Exit
+					sessionController.onClickExit();
+				break;
+
+
+				// IMAGE SUB-MENU
+				case 'preview': // preview Image
+					onClickImagePreview();
+				break;
+
+				case 'import': // import Image
+					onClickImageImport();
+				break;
+
+				case 'export': // export Image
+					onClickImageExport();
+				break;
+
+				case 'email': // email Image
+					onClickImageEmail();
+				break;
+				
+				case 'print': // print Image
+					onClickImagePrint();
+				break;
+
+
+				// CLOUD SUB-MENU
+				case 'browse': // Browse clouds in the CloudLibrary
+					onClickBrowseCloudLibrary();
+				break;
+
+
+				case 'submit': // submit current Cloud to CloudLibrary, (removed)
+					shareController.ShareImageCloud(null);
+				break;
+
+				// SHARE SUB-SUB-MENU
+				case 'shareImage':
+					shareController.ShareImageCloud(null);
+				break;
+
+				case 'shareFont':
+					shareController.ShareCloud(null, CloudType.ST_FONT);
+				break;
+
+				case 'shareBrush':
+					shareController.ShareCloud(null, CloudType.ST_BRUSH);
+				break;
+
+				case 'shareShape':
+					shareController.ShareCloud(null, CloudType.ST_SHAPE);
+				break;
+
+				case 'shareGradient':
+					shareController.ShareCloud(null, CloudType.ST_GRADIENT);
+				break;
+
+				case 'shareEffect':
+					shareController.ShareCloud(null, CloudType.ST_EFFECT);
+				break;
+
+	        	
+	        	
+				// HELP SUB-MENU
+				case 'online': // online help
+					onClickOnlineHelp();
+				break;
+
+				case 'chat': // Chat with other user, ask a question (L8er)
+				break;
+
+				case 'contact': // submit bug or suggestion
+					onClickContact();
+				break;
+
+				case 'about': // About TriCloud ! : ME
+					onClickAbout();
+				break;
+			}
+		}
+
+
+		
+
+		
+		// IMAGE PREVIEW
+		// ------------------------------
+		private function onClickImagePreview():void
+		{
+			if(!canvas)
+				return;
+
+			PopUpManager.addPopUp(imagePreviewDialog, this.parentApplication as DisplayObject, true);
+			imagePreviewDialog.init(canvas, canvas.name, true);
+			PopUpManager.centerPopUp(imagePreviewDialog);
+
+			imagePreviewDialog.addEventListener("close", onCloseImagePreview); // detect closing
+			imagePreviewDialog.addEventListener("export", onCloseExportImagePreview); // detect closing
+		}
+
+		// Close image preview
+		private function onCloseImagePreview(event:Event):void
+        {
+        	imagePreviewDialog.removeEventListener("close", onCloseImagePreview); // remove event listener
+        	imagePreviewDialog.removeEventListener("export", onCloseExportImagePreview); // detect closing
+
+            PopUpManager.removePopUp(imagePreviewDialog);
+        }
+
+		// Close image preview and Export
+		private function onCloseExportImagePreview(event:Event):void
+        {
+        	onCloseImagePreview(event);
+
+        	// Call export Dialog
+        	onClickImageExport();
+        }
+
+
+		// IMAGE IMPORT
+		// ------------------------------
+		private function onClickImageImport():void
+		{
+			PopUpManager.addPopUp(imageImportDialog, this.parentApplication as DisplayObject, true);
+			imageImportDialog.Init();
+			PopUpManager.centerPopUp(imageImportDialog); // Center Image dialog	
+		}
+
+
+		// IMAGE EXPORT
+		// ------------------------------
+		private function onClickImageExport():void
+		{
+			PopUpManager.addPopUp(imageExportDialog, this.parentApplication as DisplayObject, true);
+			imageExportDialog.init(canvas);
+			PopUpManager.centerPopUp(imageExportDialog); // Center Image dialog	
+		}
+
+
+		// IMAGE EMAIL
+		private function onClickImageEmail():void
+		{
+			PopUpManager.addPopUp(emailDialog, this.parentApplication as DisplayObject, true);
+			emailDialog.Init(canvas);
+			PopUpManager.centerPopUp(emailDialog); // Center Image dialog	
+		}
+
+
+		// IMAGE PRINT
+		private function onClickImagePrint():void
+		{
+			PopUpManager.addPopUp(printDialog, this.parentApplication as DisplayObject, true);
+			printDialog.Init(canvas);
+			PopUpManager.centerPopUp(printDialog); // Center Image dialog
+		}
+
+
+		// Clicked SESSION menu
+		private function onClickSession():void
+		{
+			if(sessionController.IsUserLogged()) // is Logged
+			{
+				//sessionMenu.dataProvider.source.(@name == 'login').@label = 'Logout';
+			}
+			else // is not Logged
+			{
+				//sessionMenu.dataProvider.source.(@name == 'login').@label = 'Login';
+			}
+		}
+
+		// LOGIN/LOGOUT
+		private function onClickLogin():void
+		{
+			if(!sessionController.IsUserLogged()) // if User not Logged?
+			{
+				PopUpManager.addPopUp(loginDialog, this.parentApplication as DisplayObject, true);
+				PopUpManager.centerPopUp(loginDialog); // Center Login dialog	
+			}
+			else // User Logged
+			{
+				var alert:Alert = Alert.show("Are you sure you want to Logout?", "Logout", 3, canvas, alertClickHandlerLogout);
+				alert.titleIcon = Globals.g_assets.TriCloudIcon16;
+			}
+		}
+
+		// Asked if really want to Logout
+        private function alertClickHandlerLogout(event:CloseEvent):void 
+        {
+			if(event.detail==Alert.YES)
+            {
+            	sessionController.SetUser(null); // Logout 
+            }
+            else
+            {
+            	return;
+            }
+        }
+		
+
+
+		// MY PORTFOLIO
+		private function onClickMyPortfolio():void
+		{
+			var userXML:XML = sessionController.GetUser();
+			if(userXML)
+			{
+				// Open My Portfolio
+				navigateToURL(new URLRequest('/portfolio/index/' + userXML.@id + '?view=private'), 'TriCloud');
+			}
+			else
+			{
+				// Not logged, Join
+				navigateToURL(new URLRequest('/portfolio/join'), 'TriCloud');
+
+				sessionController.GetSession().ValidateUser();
+			}
+		}
+
+
+
+
+
+
+		// CLOUD MENU
+
+		private function onClickBrowseCloudLibrary():void
+		{
+			TriCloud(this.parentApplication).setCurrentState('cloudLibrary');
+		}
+
+
+
+
+		// HELP MENU
+		
+		// Request Online Help
+		private function onClickOnlineHelp():void
+		{
+			PopUpManager.addPopUp(helpDialog, this.parentApplication as DisplayObject, true);
+			PopUpManager.centerPopUp(helpDialog); // Center Image dialog	
+		}
+
+
+		// Bug Report Feature Requests
+		private function onClickContact():void
+		{
+			PopUpManager.addPopUp(contactDialog, this.parentApplication as DisplayObject, true);
+			PopUpManager.centerPopUp(contactDialog); // Center Image dialog	
+		}
+
+
+		// About TriCloud
+		private function onClickAbout():void
+		{
+			PopUpManager.addPopUp(aboutDialog, this.parentApplication as DisplayObject, true);
+			PopUpManager.centerPopUp(aboutDialog); // Center Image dialog	
+		}
+
+
+    ]]>
+    </mx:Script>
+
+
+
+	<mx:XML id="sessionMenuData">
+    	<menuitem label="Session" name="session">
+            <menuitem label="Login" name="login" />
+            <menuitem label="My Portfolio" name="myPortfolio"/>
+            <menuitem type="separator"/>
+            <menuitem label="New" name="new"/>
+            <menuitem label="Load" name="load"/>
+            <menuitem label="Save" name="save"/>
+            <menuitem type="separator"/>
+            <menuitem label="History" name="history"/>
+            <menuitem type="separator"/>
+            <menuitem label="Exit" name="exit"/>
+        </menuitem>
+    </mx:XML>
+
+  	<mx:XML id="imageMenuData">
+  		<menuitem label="Image" name="session">
+        	<menuitem label="Preview" name="preview"/>
+        	<menuitem type="separator"/>
+        	<menuitem label="Import" name="import"/>
+        	<menuitem label="Export" name="export"/>
+        	<menuitem type="separator"/>
+        	<menuitem label="Send email" name="email"/>
+        	<menuitem label="Print" name="print"/>
+        </menuitem>
+  	</mx:XML>
+
+    <mx:XML id="cloudMenuData">
+        <menuitem label="Cloud" name="cloud">
+        	<menuitem label="Browse Library" name="browse"/>
+        	<menuitem type="separator"/>
+        	<menuitem label="Share Clouds" name="share">
+	        	<menuitem label="Image" name="shareImage"/>
+	        	<menuitem label="Font" name="shareFont"/>
+	        	<menuitem label="Brush" name="shareBrush"/>
+	        	<menuitem label="Shape" name="shareShape"/>
+	        	<menuitem label="Gradient" name="shareGradient"/>
+	        	<menuitem label="Effect" name="shareEffect"/>
+	        </menuitem>
+        </menuitem>
+    </mx:XML>
+
+	<mx:XML id="helpMenuData">
+        <menuitem label="Help" name="help">
+        	<menuitem label="Online Help" name="online"/>
+        	<menuitem type="separator"/>
+        	<menuitem label="Feedback" name="contact"/>
+        	<menuitem label="About" name="about"/>
+        </menuitem>
+    </mx:XML>
+
+
+
+	<mx:LinkBar id="undoButtons"
+		alpha="0.7"
+		paddingLeft="0" paddingRight="0" paddingTop="0" paddingBottom="2"
+		horizontalGap="0" verticalGap="0"
+		verticalAlign="bottom"
+		itemClick="sessionController.onItemClickHistoryBtn(event)">
+		<mx:Array>
+			<mx:Object name="undo" icon="{Globals.g_assets.UndoIcon}" toolTip="Undo the last action"/>
+			<mx:Object name="redo" icon="{Globals.g_assets.RedoIcon}" toolTip="Redo the last action"/>
+		</mx:Array>
+	</mx:LinkBar>
+
+
+	<mx:Spacer width="100%"/>
+
+	<mx:LinkBar id="appMenu"
+		labelField="label"
+		color="0x1043E4" alpha="0.5"
+		separatorWidth="2" separatorColor="0xCCCCCC"
+		verticalAlign="bottom"
+		itemClick="onItemClickAppMenu(event)">
+ 			<mx:Object name="session" label="Session" />
+ 			<mx:Object name="image" label="Image" />
+ 			<mx:Object name="cloud" label="Cloud" />
+ 			<mx:Object name="help" label="Help" />
+	 </mx:LinkBar>
+
+
+	<mx:Spacer width="100%"/>
+
+
+	<mx:Box height="100%" 
+		verticalAlign="bottom"
+		alpha="1.0">
+
+		<mx:LinkButton id="previewBtn" width="24" height="24"
+			icon="{Globals.g_assets.ImagePreview}"
+			toolTip="Image Preview"
+			click="onClickImagePreview()"/>
+
+	</mx:Box>
+
+
+</mx:HBox>

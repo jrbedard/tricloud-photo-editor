@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Button xmlns:mx="http://www.adobe.com/2006/mxml"
+	width="36" height="36"
+	toolTip="{selectedShape.name} Shape"
+	buttonMode="true"
+
+	selectedUpSkin="controls.colorClasses.ColorButtonSkin"
+	selectedOverSkin="controls.colorClasses.ColorButtonSkin"
+	upSkin="controls.colorClasses.ColorButtonSkin"
+	overSkin="controls.colorClasses.ColorButtonSkin"
+	downSkin="controls.colorClasses.ColorButtonSkin"
+	selectedDownSkin="controls.colorClasses.ColorButtonSkin"
+	disabledSkin="controls.colorClasses.ColorButtonSkin"
+	selectedDisabledSkin="controls.colorClasses.ColorButtonSkin"
+
+	creationComplete="onCreationComplete()">
+
+
+	<mx:Script>
+    <![CDATA[
+    
+    	import mx.managers.PopUpManager;
+
+		import controls.shapeClasses.*;
+
+
+		private var shapeDialog:ShapeDialog = ShapeDialog.shapeDialog;
+		private var shapeDialogVisible:Boolean = false; // panel open
+
+		private var _selectedShape:CloudShape = new CloudShape(); // select default brush by default
+
+		private var shapeMatrix:Matrix = new Matrix();
+
+	
+
+		public function set selectedShape(shape:CloudShape):void
+		{
+			_selectedShape = shape;
+			UpdateButtonImage();
+		}
+		[Bindable]
+		public function get selectedShape():CloudShape
+		{
+			return _selectedShape;
+		}
+		
+
+		private function onCreationComplete():void
+		{
+			shapeDialog.addEventListener("shapeChanged", onShapeChanged);
+			shapeDialog.addEventListener("close", onCloseShapePanel);
+
+			UpdateButtonImage();
+		}
+
+
+		protected override function clickHandler(event:MouseEvent):void
+		{
+			event.stopPropagation(); // Dont continue click event on something below this control
+
+			if(!shapeDialogVisible)
+			{
+				CloudDialogManager.OpenDialog(shapeDialog, this);
+				shapeDialogVisible = true;
+
+				shapeDialog.shapeGrid.selectedItem = selectedShape;
+			}
+			else
+			{
+				CloudDialogManager.CloseDialog(shapeDialog);
+				shapeDialogVisible = false;
+			}
+		}
+
+
+		// A brush was selected
+		private function onShapeChanged(event:ShapeEvent):void
+		{
+			selectedShape = event.shape;
+			UpdateButtonImage();
+		}
+
+
+		private function onCloseShapePanel(event:Event):void
+		{
+			CloudDialogManager.CloseDialog(shapeDialog);
+			shapeDialogVisible = false;
+		}
+
+
+		private function UpdateButtonImage():void
+		{
+			if(!selectedShape || !selectedShape.iconBitmap)
+				return;
+
+			shapeMatrix.createBox((this.width-8)/selectedShape.iconBitmap.width, 
+								  (this.height-8)/selectedShape.iconBitmap.height,
+								  0,
+								  4,4);
+
+			this.graphics.clear();
+			this.graphics.beginBitmapFill(selectedShape.iconBitmap.bitmapData, shapeMatrix, false, true);
+			this.graphics.drawRect(4,4, this.width-8, this.height-8);
+			this.graphics.endFill();
+		}
+
+
+
+    ]]>
+    </mx:Script>
+
+</mx:Button>

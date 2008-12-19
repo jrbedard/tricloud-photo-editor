@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Panel xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:cloudPanels="panels.*"
+	xmlns:rightPanels="panels.right.*" xmlns:cloudLibrary="library.*"
+
+	horizontalScrollPolicy="off" verticalScrollPolicy="off"
+
+	styleName="CloudPanel"
+   	>
+
+
+    <mx:Script>
+    <![CDATA[
+
+    	import mx.rpc.events.ResultEvent;        
+        import mx.controls.Alert;
+
+
+        public function init():void
+        {
+        	rightAcc.getHeaderAt(0).setStyle("paddingBottom", 12); // Offset Cloud Name to leave some space for Cloud Type
+
+			cloudPanel.init(cloudPanelHeader);
+			canvasPanel.init(rightAcc.getHeaderAt(1));
+
+			metaCloudPanel.init(metaCloudPanelHeader);
+        }
+
+
+
+		private function onChildIndexChange():void
+		{
+			
+		}
+
+    ]]>
+    </mx:Script>
+
+
+
+	<mx:ViewStack id="rightViewStack" width="100%" height="100%"
+		creationPolicy="all"
+		borderStyle="none"
+		paddingTop="0"
+		childIndexChange="onChildIndexChange()">
+
+
+		<!-- RIGHT panel for "My Clouds" -->
+		<mx:Canvas width="100%" height="100%" backgroundAlpha="0"
+			horizontalScrollPolicy="off" verticalScrollPolicy="off"
+			> 
+			 	<!-- Not very optimal to use canvas, but we need this for the fake cloud panel header
+			 		 TODO: re-enable those scroll bar-->
+
+			<mx:Accordion id="rightAcc" width="100%" height="100%"
+				creationPolicy="all" 
+				historyManagementEnabled="false">
+
+				<rightPanels:CloudPanel id="cloudPanel" width="100%" height="100%"
+					icon="{Globals.g_assets.Blank48Icon}"/>
+
+				<rightPanels:CanvasPanel id="canvasPanel" width="100%" height="100%"
+					icon="{Globals.g_assets.Blank48Icon}" label="Canvas"/>
+
+			</mx:Accordion>
+
+			<rightPanels:CloudPanelHeader id="cloudPanelHeader" width="100%" height="53"
+				x="0" y="0"
+				currentState="cloudDesign"/>
+
+		</mx:Canvas>
+
+
+		<!-- RIGHT panel for "Cloud Library" -->
+		<mx:Canvas width="100%" height="100%" backgroundAlpha="0"
+			 horizontalScrollPolicy="off" verticalScrollPolicy="off"
+			 >
+			 	<!-- Not very optimal to use canvas, but we need this for the fake cloud proxy panel header
+			 		 TODO: re-enable those scroll bar-->
+
+			<!-- Remote Cloud Preview panel on the right -->
+			<cloudLibrary:MetaCloudPanel id="metaCloudPanel" width="100%" height="100%"/>
+
+			<rightPanels:CloudPanelHeader id="metaCloudPanelHeader" width="100%" height="53"
+				x="0" y="0" 
+				currentState="cloudLibrary"/>
+
+		</mx:Canvas>
+
+	</mx:ViewStack>
+
+
+	<mx:Fade id="rightPanelShow" alphaFrom="0.0" alphaTo="1.0" duration="250" />
+	<mx:Fade id="rightPanelHide" alphaFrom="1.0" alphaTo="0.0" duration="250" />
+
+</mx:Panel>

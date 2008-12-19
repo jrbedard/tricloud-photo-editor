@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:HBox xmlns:mx="http://www.adobe.com/2006/mxml"
+	toolTip="{brush.name}"
+
+	horizontalGap="2"
+	horizontalAlign="left" verticalAlign="middle"
+	paddingBottom="2" paddingLeft="2" paddingTop="2" paddingRight="2"
+
+	creationComplete="onCreationComplete()"
+ 	dataChange="onDataChange(event)">
+
+
+	<mx:Script>
+	<![CDATA[
+
+		[Bindable]
+		private var brush:CloudBrush = null;
+
+		[Bindable]
+		private var iconBitmap:Bitmap = null;
+
+		[Bindable]
+		private var sampleBmp:Bitmap = null;
+
+
+
+		private function onCreationComplete():void
+		{
+			
+		}
+
+		private function onDataChange(event:Event):void
+		{
+			brush = this.data as CloudBrush;
+
+			if(brush && brush.iconBitmap && brush.iconBitmap)
+			{
+				iconBitmap = new Bitmap(brush.iconBitmap.bitmapData, "auto", false);
+			}
+		}
+
+	]]>
+    </mx:Script>
+
+
+	<mx:Box borderStyle="solid">
+		<mx:Image id="brushImage" source="{iconBitmap}" width="160" height="32" />
+	</mx:Box>
+
+</mx:HBox>

@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml" 
+	layout="vertical" width="300" height="200"
+	titleIcon="{Globals.g_assets.AlignCenterIcon}"
+	title="TriCloud Login"
+	horizontalScrollPolicy="off" verticalScrollPolicy="off"
+	showCloseButton="true"
+
+	styleName="CloudDialog"
+	titleStyleName="CloudDialogTitle"
+	verticalAlign="middle"
+
+	creationComplete="onCreationComplete()"
+	show="passwordInput.text = '';"
+	close="onClickCancel()">
+
+
+	<mx:Script>
+    <![CDATA[
+    	import mx.utils.ObjectProxy;
+		import mx.rpc.remoting.RemoteObject;
+        import mx.rpc.events.*;
+        import mx.controls.Alert;
+		import mx.managers.CursorManager;
+		import mx.managers.PopUpManager;
+		import mx.events.ValidationResultEvent;
+
+
+		// Static instance, singleton
+		public static const loginDialog:LoginDialog = new LoginDialog();
+
+
+		// RoR RO
+        private var userRemObj:RemoteObject = new RemoteObject();
+
+
+		[Bindable]
+		private var sessionController:SessionController = null;
+
+
+
+
+
+		private function onCreationComplete():void
+		{
+			// Set the Right Click menu for this Dialog
+   			var rightClickMenu:RightClickMenu = new RightClickMenu(this.title);
+   			this.contextMenu = rightClickMenu.triCloudContextMenu;
+
+			// Remote object events
+    		userRemObj.destination = "UserService";
+    		userRemObj.login.addEventListener("result", onResultLogin);
+        	userRemObj.addEventListener("fault", onFault);
+
+        	sessionController = CloudEngine.GetInstance().GetSessionController();
+		}
+
+ 		// Event listener for the valid and invalid events.
+		private function handleLoginValid(eventObj:ValidationResultEvent):void
+		{
+			if(eventObj.type==ValidationResultEvent.VALID)    
+				loginButton.enabled = true;
+			else
+				loginButton.enabled = false;
+		}
+
+
+		private function onClickLogin():void
+		{
+			// LOGIN!
+			userRemObj.login(loginInput.text, passwordInput.text);
+
+			CursorManager.setBusyCursor();
+			this.enabled = false;
+		}
+
+		// Result on Login
+		private function onResultLogin(event:ResultEvent):void 
+    	{
+    		this.enabled = true;
+    		CursorManager.removeBusyCursor();
+
+			var userXML:XML = XMLList(event.result).descendants()[0]; // first returned user
+			if(userXML)
+			{
+				CloudAlert.show("You are now logged to TriCloud as '" + userXML.@name + "'", 'TriCloud Login');
+				sessionController.SetUser(userXML);
+				onClickCancel(); // Close Dialog
+			}
+			else
+			{
+				CloudAlert.show("The Login/Password that you entered is invalid.", 'TriCloud Login');
+				passwordInput.text = '';
+			}
+    	}
+
+		// FAULT
+		private function onFault(event:FaultEvent):void 
+        {
+        	this.enabled = true;
+    		CursorManager.removeBusyCursor();
+
+    		CloudAlert.show(event.fault.faultString, 'TriCloud Login Error');
+    		passwordInput.text = '';
+        }
+
+
+		private function onClickCancel():void
+		{
+			passwordInput.text = '';
+			PopUpManager.removePopUp(loginDialog);
+		}
+
+    ]]>
+    </mx:Script>
+
+
+	<mx:HBox horizontalGap="0" verticalAlign="middle">
+		<mx:Label text="Don't have a TriCloud account?" />
+		<mx:LinkButton label="Join Now!" click="navigateToURL(new URLRequest('/join'), 'TriCloud');" 
+			toolTip="It's Fast, Easy and Free! Use Your Porfolio to manage Your Clouds, Sessions and Creations. Use the Cloud Library. And More!"/>
+	</mx:HBox>
+
+
+	<mx:Form width="100%" verticalGap="5"
+		paddingTop="15" paddingLeft="5" paddingRight="5" paddingBottom="5">
+
+		<mx:FormItem label="Login:" fontWeight="bold">
+			<mx:TextInput id="loginInput" width="150" />
+		</mx:FormItem>
+
+		<mx:FormItem label="Password:" fontWeight="bold">
+			<mx:TextInput id="passwordInput" displayAsPassword="true" width="150"/>
+		</mx:FormItem>
+
+	</mx:Form>
+
+
+	<mx:Validator id="reqValid" required="true"
+        source="{loginInput}" property="text" 
+        valid="handleLoginValid(event)" invalid="handleLoginValid(event)"/>
+
+
+	<mx:ControlBar>
+		<mx:Button id="loginButton" label="Login" enabled="false" click="onClickLogin()" styleName="OkButton" />
+		<mx:Button id="cancelButton" label="Cancel" click="onClickCancel()" styleName="CancelButton" />		
+	</mx:ControlBar>
+	
+
+</mx:TitleWindow>

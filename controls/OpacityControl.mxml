@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:HSlider xmlns:mx="http://www.adobe.com/2006/mxml"
+	minimum="0.0" maximum="1.0" width="125"
+	liveDragging="true" snapInterval="0.01"
+	tickInterval="0.1" tickColor="0x000000" tickThickness="1"
+	labels="['0%','50%','100%']"
+	toolTip="Select the opacity from 0% to 100%"
+	dataTipFormatFunction="dataTipFunc"
+	value="1.0"
+
+	thumbPress="CloudCursor.SetCursor(CloudCursor.TRANSLATE_HORI);"
+	thumbRelease="CloudCursor.SetCursor(CloudCursor.NORMAL);">
+
+
+	<mx:Script>
+    <![CDATA[
+
+		import flash.display.GradientType;
+		import flash.display.InterpolationMethod;
+
+
+    	private var _drawColor:uint = 0x000000;
+
+		private var mat:Matrix = new Matrix();
+
+
+		private function dataTipFunc(val:Number):String
+		{
+			return Math.floor(val * 100) + '%';
+		}
+
+
+		[Inspectable(defaultValue=0)]
+		public function set drawColor(value:uint):void
+		{
+			_drawColor = value;
+
+  			mat.createGradientBox(this.width, 0, 0, 0, 0); // horizontal slider
+  			//mat.createGradientBox(0, this.height, 0, 0, 0); // verrical slider
+  
+			this.graphics.clear();
+			this.graphics.lineStyle(0,0,0);
+			this.graphics.beginGradientFill(GradientType.LINEAR, [_drawColor, _drawColor], [0.0, 1.0], [0, 255], mat);
+			this.graphics.drawRect(5, 15, this.width-10, 10); // horizontal slider
+			//this.graphics.drawRect(5, 5, 10, this.height-10); // vertical slider
+			this.graphics.endFill();
+		}
+
+		//[Bindable] // doesnt work with that?
+		public function get drawColor():uint
+		{
+			return _drawColor;
+		}
+
+
+    ]]>
+    </mx:Script>
+
+
+</mx:HSlider>

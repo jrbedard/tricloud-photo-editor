@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:HBox xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:cloudDialogs="dialogs.*" >
+
+
+	<mx:Script>
+    <![CDATA[
+
+		import core.Cloud;
+
+
+		[Bindable]
+    	private var m_cloud:Cloud = null; // Cloud to submit
+
+		[Bindable]
+		private var imageXML:XML = null;
+
+
+    	public function init(sCloud:Cloud):void
+    	{
+    		m_cloud = sCloud;
+
+    		if(imagePreview)
+				imagePreview.init();
+
+			imageXML = new XML("<image></image>");
+
+    		imageXML.@width = sCloud.width.toFixed(0);
+    		imageXML.@height = sCloud.height.toFixed(0);
+    	}
+
+	]]>
+    </mx:Script>
+
+
+	<!-- CLOUD PREVIEW IMAGE -->
+	<cloudDialogs:ImagePreview id="imagePreview" height="100%" 
+		sourcePanel="{m_cloud}" iconWidth="100" iconHeight="100"/>
+
+	<mx:Form id="imageForm" 
+		verticalGap="0">
+
+		<mx:FormItem label="Width:">
+			<mx:Label text="{imageXML.@width} pixels" />
+		</mx:FormItem>
+
+		<mx:FormItem label="Height:">
+			<mx:Label text="{imageXML.@height} pixels" />
+		</mx:FormItem>
+
+	</mx:Form>
+
+		
+</mx:HBox>
